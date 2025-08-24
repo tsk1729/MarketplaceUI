@@ -1,0 +1,3 @@
+export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://ikygxetagzzrdajalxwl.supabase.co';
+export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlreWd4ZXRhZ3p6cmRhamFseHdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI4MjA0NTcsImV4cCI6MjA0ODM5NjQ1N30.rG4mpQx8LRQCtxP9ERsaS5YPl2QTEi6xq6vvx4KJUQk';
+export const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '616464916369-vqv17bk096srcebp4v0jvermv4ktcf2c.apps.googleusercontent.com';
