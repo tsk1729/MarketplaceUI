@@ -89,20 +89,23 @@ export const styles = StyleSheet.create({
     instagramInputRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 8,
+        width: '100%',
     },
     instagramInput: {
         flex: 1,
+        minWidth: 0, // Allow input to shrink if needed
     },
     connectButton: {
-        backgroundColor: COLORS.white, // Modern indigo color
-        paddingHorizontal: 20,
-        paddingVertical: 16,
+        backgroundColor: COLORS.white,
+        paddingHorizontal: Platform.OS === 'web' ? 16 : 12,
+        paddingVertical: 12,
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         minHeight: 56,
-        minWidth: 90,
+        maxWidth: 120, // Prevent button from getting too wide
+        flexShrink: 0, // Prevent button from shrinking
         shadowColor: '#6366F1',
         shadowOffset: {
             width: 0,
@@ -114,8 +117,15 @@ export const styles = StyleSheet.create({
     },
     connectButtonText: {
         color: COLORS.background,
-        fontSize: 16,
+        fontSize: Platform.OS === 'web' ? 14 : 15,
         fontWeight: '600',
+        textAlign: 'center',
+        ...(Platform.OS === 'ios' && {
+            fontSize: 14,
+        }),
+        ...(Platform.OS === 'android' && {
+            fontSize: 14,
+        }),
     },
     connectedButton: {
         backgroundColor: COLORS.white, // Modern emerald green
@@ -130,8 +140,15 @@ export const styles = StyleSheet.create({
     },
     connectedButtonText: {
         color: COLORS.background,
-        fontSize: 16,
+        fontSize: Platform.OS === 'web' ? 13 : 14,
         fontWeight: '600',
+        textAlign: 'center',
+        ...(Platform.OS === 'ios' && {
+            fontSize: 13,
+        }),
+        ...(Platform.OS === 'android' && {
+            fontSize: 13,
+        }),
     },
     connectButtonDisabled: {
         backgroundColor: '#64748B', // Modern slate color

@@ -668,10 +668,15 @@ const CreatorScreen = () => {
                                             {isCheckingConnection ? (
                                                 <ActivityIndicator size="small" color={COLORS.background} />
                                             ) : (
-                                                <Text style={[
-                                                    styles.connectButtonText,
-                                                    instagramConnectionStatus === 'connected' && styles.connectedButtonText
-                                                ]}>
+                                                <Text 
+                                                    style={[
+                                                        styles.connectButtonText,
+                                                        instagramConnectionStatus === 'connected' && styles.connectedButtonText
+                                                    ]}
+                                                    numberOfLines={1}
+                                                    adjustsFontSizeToFit={true}
+                                                    minimumFontScale={0.8}
+                                                >
                                                     {instagramConnectionStatus === 'connected' ? '✓ Connected' : 'Connect'}
                                                 </Text>
                                             )}
