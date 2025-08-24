@@ -52,9 +52,9 @@ export const getUserName = async () => {
         const { user } = await isAuthenticated();
         if (user) {
             // Try to get name from user metadata, fallback to email
-            return user.user_metadata?.full_name || 
-                   user.user_metadata?.name || 
-                   user.email?.split('@')[0] || 
+            return user.user_metadata?.full_name ||
+                   user.user_metadata?.name ||
+                   user.email?.split('@')[0] ||
                    'User';
         }
         return 'User';
@@ -75,8 +75,8 @@ export const signInWithGoogle = async () => {
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                // redirectTo: 'https://labs.owlit.in',
-                redirectTo: 'http://localhost:8081',
+                redirectTo: 'https://market.owlit.in',
+                // redirectTo: 'http://localhost:8081',
                 // redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
                 queryParams: {
                     access_type: 'offline',
