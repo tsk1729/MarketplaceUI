@@ -75,8 +75,8 @@ export const signInWithGoogle = async () => {
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: 'https://market.owlit.in',
-                // redirectTo: 'http://localhost:8081',
+                // redirectTo: 'https://market.owlit.in',
+                redirectTo: 'http://localhost:8081',
                 // redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
                 queryParams: {
                     access_type: 'offline',
