@@ -117,7 +117,7 @@ export const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: COLORS.white,
-        paddingVertical: isDesktopWeb ? 20 : 18,
+        paddingVertical: isDesktopWeb ? 10 : 18,
         paddingHorizontal: isDesktopWeb ? 32 : 24,
         borderRadius: isDesktopWeb ? 18 : 16,
         marginBottom: isDesktopWeb ? 24 : 20,
@@ -239,5 +239,5 @@ export const styles = StyleSheet.create({
         padding: 24,
         boxSizing: 'border-box',
     },
-}); 
+});
 export default styles;

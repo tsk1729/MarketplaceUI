@@ -2,10 +2,10 @@ import { COLORS } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState, useRef } from 'react';
-import { Text, TouchableOpacity, View, Animated } from 'react-native';
+import { Text, TouchableOpacity, View, Animated, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { isAuthenticated, getUserName } from '../utils/auth';
+import { isAuthenticated, getUserName, signOut } from '../utils/auth';
 import { styles } from './styles';
 
 const ConnectScreen = () => {
@@ -71,7 +71,7 @@ const ConnectScreen = () => {
 
         // Queue count animation with listener
         const queueAnimation = Animated.timing(queueCountAnim, {
-            toValue: 3000,
+            toValue: 396,
             duration: 2000,
             useNativeDriver: false,
         });
@@ -115,7 +115,7 @@ const ConnectScreen = () => {
             }),
         ]).start();
 
-        router.push('/(agency)/agency');
+        router.push('/(creator)/creatorProfileEdit');
     };
 
     const handleCreatorPress = async () => {
@@ -135,6 +135,32 @@ const ConnectScreen = () => {
 
         router.push('/(creator)/creator');
     };
+    const goToBrandMarketPlace = async () => {
+        // Button press animation
+        Animated.sequence([
+            Animated.timing(buttonScale, {
+                toValue: 0.95,
+                duration: 100,
+                useNativeDriver: true,
+            }),
+            Animated.timing(buttonScale, {
+                toValue: 1,
+                duration: 100,
+                useNativeDriver: true,
+            }),
+        ]).start();
+
+        router.push('/(agency)/posts');
+    };
+
+    const handleSignOut = async () => {
+        try {
+            await signOut();
+            router.replace('/(Login)/login');
+        } catch (error) {
+            console.error('Error signing out:', error);
+        }
+    };
 
     if (isLoading) {
         return (
@@ -143,7 +169,7 @@ const ConnectScreen = () => {
                     colors={[COLORS.background, COLORS.surface, COLORS.background]}
                     style={styles.loadingContainer}
                 >
-                    <Animated.View 
+                    <Animated.View
                         style={[
                             styles.loadingSpinner,
                             {
@@ -171,7 +197,19 @@ const ConnectScreen = () => {
                 style={styles.container}
             >
                 <SafeAreaView style={styles.safeArea}>
-                    <Animated.View 
+                    <View style={styles.topBar}>
+                        <Pressable
+                            style={styles.signOutButton}
+                            onPress={handleSignOut}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityRole="button"
+                        >
+                            <Ionicons name="log-out-outline" size={16} color={COLORS.white} />
+                            <Text style={styles.signOutText} selectable={false}>Sign out</Text>
+                        </Pressable>
+                    </View>
+                    <Animated.View
+                        pointerEvents="box-none"
                         style={[
                             styles.content,
                             {
@@ -184,7 +222,7 @@ const ConnectScreen = () => {
                         ]}
                     >
                         <View style={styles.header}>
-                            <Animated.Text 
+                            <Animated.Text
                                 style={[
                                     styles.greeting,
                                     {
@@ -194,7 +232,7 @@ const ConnectScreen = () => {
                             >
                                 Hi {userName}!
                             </Animated.Text>
-                            <Animated.Text 
+                            <Animated.Text
                                 style={[
                                     styles.title,
                                     {
@@ -202,16 +240,16 @@ const ConnectScreen = () => {
                                     }
                                 ]}
                             >
-                                Welcome to Marketplace
+                                Welcome to Brands Market Place
                             </Animated.Text>
-                            
+
                             <View style={styles.queueContainer}>
                                 <Text style={styles.queueNumber}>
                                     {queueCount.toLocaleString()}
                                 </Text>
-                                <Text style={styles.queueText}>people are already in Queue</Text>
+                                <Text style={styles.queueText}>brands are already in Queue</Text>
                             </View>
-                            
+
                             <Text style={styles.subtitle}>
                                 Please fill the details by clicking the following button
                             </Text>
@@ -232,21 +270,22 @@ const ConnectScreen = () => {
                                     <View style={styles.iconContainer}>
                                         <Ionicons name="business" size={24} color={COLORS.white} />
                                     </View>
-                                    <Text style={styles.buttonText}>I'm an Ad Agency</Text>
+                                    <Text style={styles.buttonText}>Edit Profile</Text>
                                     <Ionicons name="arrow-forward" size={20} color={COLORS.background} />
                                 </View>
                             </TouchableOpacity>
 
                             <TouchableOpacity
                                 style={[styles.userTypeButton, styles.contentCreatorButton]}
-                                onPress={handleCreatorPress}
+                                // onPress={handleCreatorPress}
+                                onPress={goToBrandMarketPlace}
                                 activeOpacity={0.8}
                             >
                                 <View style={styles.buttonGradient}>
                                     <View style={styles.iconContainer}>
                                         <Ionicons name="camera" size={24} color={COLORS.white} />
                                     </View>
-                                    <Text style={styles.buttonText}>I'm a Content Creator</Text>
+                                    <Text style={styles.buttonText}>Check Marketplace</Text>
                                     <Ionicons name="arrow-forward" size={20} color={COLORS.background} />
                                 </View>
                             </TouchableOpacity>
@@ -267,4 +306,4 @@ const ConnectScreen = () => {
 
 
 
-export default ConnectScreen; 
+export default ConnectScreen;

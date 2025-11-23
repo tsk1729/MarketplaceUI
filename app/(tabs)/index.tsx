@@ -227,11 +227,11 @@ export default function PostsGridScreen() {
                 console.log(`✅ Updated ${response.data.length} posts with latest automation states`);
                 setPosts(response.data);
             } else {
-                console.error('Invalid posts data received:', response);
+                console.error('Invalid posts.tsx data received:', response);
                 setPosts([]);
             }
         } catch (error) {
-            console.error('Error fetching posts:', error);
+            console.error('Error fetching posts.tsx:', error);
             setPosts([]);
         } finally {
             setIsLoading(false);
@@ -262,10 +262,10 @@ export default function PostsGridScreen() {
         fetchPosts();
     }, [fetchPosts]);
 
-    // Refetch posts when screen comes into focus (returning from automation screen)
+    // Refetch posts.tsx when screen comes into focus (returning from automation screen)
     useFocusEffect(
         useCallback(() => {
-            console.log('🔄 Screen focused - refreshing posts to update automation states');
+            console.log('🔄 Screen focused - refreshing posts.tsx to update automation states');
             fetchPosts(false); // Don't show loading when returning from automation
         }, [fetchPosts])
     );
@@ -342,7 +342,7 @@ export default function PostsGridScreen() {
                             ))}
                         </div>
 
-                        
+
                     </div>
                 )}
             </div>

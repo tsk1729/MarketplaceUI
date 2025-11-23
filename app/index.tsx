@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { isAuthenticated } from './utils/auth';
+import { isAuthenticated, getUserType } from './utils/auth';
 import { COLORS } from '@/constants/theme';
 
 export default function RootIndex() {
@@ -23,19 +23,34 @@ export default function RootIndex() {
             console.log('✅ Auth check result:', { authenticated, userId });
 
             if (authenticated && userId) {
-                console.log('👤 User is authenticated, redirecting to connect...');
+                console.log('👤 User is authenticated, checking user type...');
+
                 try {
-                    router.replace("/(connect)/connect");
-                } catch (navError) {
-                    console.error('Navigation error:', navError);
-                    // Fallback navigation
-                    setTimeout(() => {
-                        try {
-                            router.replace("/(connect)/connect");
-                        } catch (fallbackError) {
-                            console.error('Fallback navigation failed:', fallbackError);
-                        }
-                    }, 500);
+                    // Get user type to determine routing
+                    const userType = await getUserType();
+                    console.log('📋 User type:', userType);
+
+                    // Route based on user type
+                    const targetRoute = userType === 'brand' ? "/(connect)/agency" : "/(connect)/influencer";
+                    console.log('🎯 Routing to:', targetRoute);
+
+                    router.replace(targetRoute);
+                } catch (userTypeError) {
+                    console.error('❌ Error getting user type:', userTypeError);
+                    // Fallback: redirect to login on user type error
+                    try {
+                        router.replace("/(Login)/login");
+                    } catch (fallbackNavError) {
+                        console.error('Fallback navigation failed:', fallbackNavError);
+                        // Last resort fallback
+                        setTimeout(() => {
+                            try {
+                                router.replace("/(Login)");
+                            } catch (finalFallbackError) {
+                                console.error('Final fallback navigation failed:', finalFallbackError);
+                            }
+                        }, 1000);
+                    }
                 }
             } else {
                 console.log('🚪 User not authenticated, redirecting to login...');

@@ -1,5 +1,5 @@
 import { COLORS } from "@/constants/theme";
-import { isAuthenticated, signInWithGoogle } from "../utils/auth";
+import { isAuthenticated, signInWithGoogle, setUserType, getUserType, UserType } from "../utils/auth";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useRootNavigation } from "expo-router";
@@ -67,12 +67,26 @@ export default function Login() {
       try {
         const { isAuthenticated: authenticated, userId } = await isAuthenticated();
         if (authenticated && userId) {
+          // Get user type using proper auth utility function
+          const userType = await getUserType();
+
           // Check if navigation is ready
           if (navigation?.isReady()) {
-            router.replace("/(connect)/connect");
+            // Route based on user type
+            if (userType === 'brand') {
+              router.replace("/(connect)/agency");
+            } else {
+              router.replace("/(connect)/influencer");
+            }
           } else {
             // Fallback: try again after a short delay
-            setTimeout(() => router.replace("/(connect)/connect"), 300);
+            setTimeout(() => {
+              if (userType === 'brand') {
+                router.replace("/(connect)/agency");
+              } else {
+                router.replace("/(connect)/influencer");
+              }
+            }, 300);
           }
         }
       } catch (error) {
@@ -84,8 +98,8 @@ export default function Login() {
 
     const buttonScaleAnim = useRef(new Animated.Value(1)).current;
 
-    const handleGoogleSignIn = async () => {
-        console.log('🚀 handleGoogleSignIn called');
+    const handleGoogleSignIn = async (userType: 'brand' | 'influencer') => {
+        console.log(`🚀 handleGoogleSignIn called for ${userType}`);
 
         // Button press animation
         Animated.sequence([
@@ -119,8 +133,13 @@ export default function Login() {
                 }),
             ])
         ).start();
+
         try {
-            console.log('🔍 Starting Google Sign-in...');
+            console.log(`🔍 Starting Google Sign-in for ${userType}...`);
+
+            // Store user type using proper auth utility function
+            await setUserType(userType);
+
             console.log('📞 About to call signInWithGoogle()...');
 
             const data = await signInWithGoogle();
@@ -131,14 +150,15 @@ export default function Login() {
             if (data && data.url) {
                 // For web, this will redirect to Google OAuth
                 console.log('✅ OAuth URL generated:', data.url);
-                console.log('🌐 About to redirect to Google OAuth...');
+                console.log(`🌐 About to redirect ${userType} to Google OAuth...`);
                 // The user will be redirected to Google, then back to our app
+                // User type is stored in localStorage and will be read during initialization
             } else {
                 console.log('❌ No OAuth URL in response:', data);
                 throw new Error('No OAuth URL received');
             }
         } catch (error: any) {
-            console.error('❌ Google Sign-in error:', error);
+            console.error(`❌ Google Sign-in error for ${userType}:`, error);
             console.error('❌ Error type:', typeof error);
             console.error('❌ Error message:', error.message);
             console.error('❌ Error stack:', error.stack);
@@ -150,6 +170,9 @@ export default function Login() {
             loadingAnim.stopAnimation();
         }
     };
+
+    const handleBrandSignIn = () => handleGoogleSignIn('brand');
+    const handleInfluencerSignIn = () => handleGoogleSignIn('influencer');
 
     if (isInitializing) {
         return (
@@ -187,7 +210,7 @@ export default function Login() {
     if (isDesktopWeb) {
         return (
             <SafeAreaView style={styles.container}>
-                <ScrollView 
+                <ScrollView
                     style={{ flex: 1 }}
                     contentContainerStyle={{ flexGrow: 1 }}
                     showsVerticalScrollIndicator={false}
@@ -354,16 +377,26 @@ export default function Login() {
                                     >
                                         <TouchableOpacity
                                             style={styles.googleButton}
-                                            onPress={handleGoogleSignIn}
+                                            onPress={handleInfluencerSignIn}
                                             activeOpacity={0.9}
                                         >
                                             <View style={styles.googleIconContainer}>
                                                 <Ionicons name="logo-google" size={20} color={COLORS.surface} />
                                             </View>
-                                            <Text style={styles.googleButtonText}>Continue with Google</Text>
+                                            <Text style={styles.googleButtonText}>Continue as Influencer</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.googleButton}
+                                            onPress={handleBrandSignIn}
+                                            activeOpacity={0.9}
+                                        >
+                                            <View style={styles.googleIconContainer}>
+                                                <Ionicons name="logo-google" size={20} color={COLORS.surface} />
+                                            </View>
+                                            <Text style={styles.googleButtonText}>Continue as Brand</Text>
                                         </TouchableOpacity>
                                     </Animated.View>
-                                    
+
                                     {error && (
                                         <Animated.View
                                             style={[
@@ -379,7 +412,7 @@ export default function Login() {
                                             </Text>
                                         </Animated.View>
                                     )}
-                                    
+
                                     <Text style={[styles.termsText, { textAlign: 'center' }]}>
                                         By continuing, you agree to our Terms of Service and Privacy Policy
                                     </Text>
@@ -395,7 +428,7 @@ export default function Login() {
     // Mobile layout (for both native mobile and mobile web browsers)
     return (
         <View style={{ flex: 1, backgroundColor: COLORS.background, minHeight: '100%' }}>
-            <ScrollView 
+            <ScrollView
                 style={{ flex: 1, width: '100%', height: '100%', backgroundColor: COLORS.background }}
                 contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingTop: isMobileWeb ? 40 : Platform.OS === 'ios' ? 60 : 40, paddingBottom: 40, backgroundColor: COLORS.background }}
                 showsVerticalScrollIndicator={false}
@@ -551,16 +584,26 @@ export default function Login() {
                             >
                                 <TouchableOpacity
                                     style={styles.googleButton}
-                                    onPress={handleGoogleSignIn}
+                                    onPress={handleInfluencerSignIn}
                                     activeOpacity={0.9}
                                 >
                                     <View style={styles.googleIconContainer}>
                                         <Ionicons name="logo-google" size={20} color={COLORS.surface} />
                                     </View>
-                                    <Text style={styles.googleButtonText}>Continue with Google</Text>
+                                    <Text style={styles.googleButtonText}>Continue as Influencer</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.googleButton}
+                                    onPress={handleBrandSignIn}
+                                    activeOpacity={0.9}
+                                >
+                                    <View style={styles.googleIconContainer}>
+                                        <Ionicons name="logo-google" size={20} color={COLORS.surface} />
+                                    </View>
+                                    <Text style={styles.googleButtonText}>Continue as Brand</Text>
                                 </TouchableOpacity>
                             </Animated.View>
-                            
+
                             {error && (
                                 <Animated.View
                                     style={[
@@ -574,7 +617,7 @@ export default function Login() {
                                     <Text style={styles.errorText}>{error}</Text>
                                 </Animated.View>
                             )}
-                            
+
                             <Text style={styles.termsText}>
                                 By continuing, you agree to our Terms of Service and Privacy Policy
                             </Text>

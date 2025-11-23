@@ -156,6 +156,7 @@ export const signOut = async () => {
         await removeItem('accessToken');
         await removeItem('refreshToken');
         await removeItem('userId');
+        await removeItem('userType');
         console.log('✅ Storage cleared successfully');
 
         console.log('✅ Sign out process completed successfully');
@@ -166,5 +167,47 @@ export const signOut = async () => {
     }
 };
 
+// User type management functions
+export type UserType = 'brand' | 'influencer';
 
+// Store user type in localStorage (can be upgraded to database later)
+export const setUserType = async (userType: UserType) => {
+    try {
+        console.log(`💾 Storing user type: ${userType}`);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('userType', userType);
+        }
+        console.log('✅ User type stored successfully');
+        return true;
+    } catch (error) {
+        console.error('❌ Error storing user type:', error);
+        throw error;
+    }
+};
 
+// Get user type from localStorage
+export const getUserType = async (): Promise<UserType> => {
+    try {
+        if (typeof window !== 'undefined') {
+            const userType = localStorage.getItem('userType') as UserType;
+            console.log(`📖 Retrieved user type: ${userType || 'not set'}`);
+            return userType || 'influencer'; // Default to influencer
+        }
+        console.log('📖 No window object, defaulting to influencer');
+        return 'influencer';
+    } catch (error) {
+        console.error('❌ Error retrieving user type:', error);
+        return 'influencer'; // Default fallback
+    }
+};
+
+// Check if user type is set
+export const hasUserType = async (): Promise<boolean> => {
+    try {
+        const userType = await getUserType();
+        return userType !== null && userType !== undefined;
+    } catch (error) {
+        console.error('❌ Error checking user type:', error);
+        return false;
+    }
+};

@@ -76,7 +76,7 @@ export default function FAQScreen() {
         },
         {
             question: "🦉 How can Owlit help me as a content creator?",
-            answer: "To increase your Instagram reach, consistent interaction between you and your audience is crucial. Owlit automates engagement by:\n\n✅ Allowing content creators to encourage audience comments by referencing interesting points or sharing resources.\n✅ Automatically replying to comments, reducing manual effort while keeping the conversation active.\n✅ Boosting engagement, which helps improve visibility and reach.\n✅ Studies show posts with high comments get 10x more reach.\n\nWith Owlit, you can focus on creating content while we handle the interactions! 🚀"
+            answer: "To increase your Instagram reach, consistent interaction between you and your audience is crucial. Owlit automates engagement by:\n\n✅ Allowing content creators to encourage audience comments by referencing interesting points or sharing resources.\n✅ Automatically replying to comments, reducing manual effort while keeping the conversation active.\n✅ Boosting engagement, which helps improve visibility and reach.\n✅ Studies show posts.tsx with high comments get 10x more reach.\n\nWith Owlit, you can focus on creating content while we handle the interactions! 🚀"
         },
         {
             question: "🦉 What is the validity of a webhook?",
@@ -111,8 +111,8 @@ export default function FAQScreen() {
             answer: "Yes! 🚀 We are planning to launch on YouTube, Twitter, and LinkedIn soon.\nStay connected for updates! 🎉"
         },
         {
-            question: "🦉 I don't see posts. What should I do?",
-            answer: "If you find the Sync Instagram Posts button, tap it to sync and then reload the page to reflect changes.\nIf the issue persists, try deauthorizing and then authorizing again before syncing the posts back."
+            question: "🦉 I don't see posts.tsx. What should I do?",
+            answer: "If you find the Sync Instagram Posts button, tap it to sync and then reload the page to reflect changes.\nIf the issue persists, try deauthorizing and then authorizing again before syncing the posts.tsx back."
         }
     ];
 
