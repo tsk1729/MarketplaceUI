@@ -1,11 +1,10 @@
 'use client';
-import React, { memo, useState } from "react";
+import React, { memo, useState, useEffect } from "react";
 import { COLORS } from "@/constants/theme";
-import { marketapi } from "@/utils/api";
 import { isAuthenticated } from "../utils/auth";
 
 /* -------------------------------------------------------------------------- */
-/*                                FORM SHAPE                                   */
+/* FORM SHAPE                                   */
 /* -------------------------------------------------------------------------- */
 
 const INITIAL_FORM = {
@@ -13,7 +12,7 @@ const INITIAL_FORM = {
     description: "",
     itemsToPromote: "",
     minFollowers: "",
-    minFollowersUnit: "",
+    minFollowersUnit: "K",
     keyValuePairs: [] as Array<{
         platform: string;
         metric: string;
@@ -21,14 +20,14 @@ const INITIAL_FORM = {
         unit: string;
         reward: string;
     }>,
-    restaurantImageUrl: "",
+    restaurantImage: null as File | null,
     googleMapsLink: "",
     address: "",
     guidelines: "",
 };
 
 /* -------------------------------------------------------------------------- */
-/*                               MAIN MODAL                                     */
+/* MAIN MODAL                                   */
 /* -------------------------------------------------------------------------- */
 
 export const CreatePostModal = memo(
@@ -43,11 +42,62 @@ export const CreatePostModal = memo(
     }) => {
         const [formData, setFormData] = useState(INITIAL_FORM);
         const [isSubmitting, setIsSubmitting] = useState(false);
+        const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+        // FIX: Initialize state based on prop to prevent initial flash/incorrect state
+        const [fadeClass, setFadeClass] = useState(isVisible ? "fade-in" : "hidden");
+        const [error, setError] = useState<string | null>(null);
+
+        // FIX: Trigger fade in/out transition and handle unmounting
+        useEffect(() => {
+            let timer: NodeJS.Timeout;
+            if (isVisible) {
+                setFadeClass("fade-in");
+            } else {
+                // Only animate out if we are not already hidden
+                if (fadeClass !== 'hidden') {
+                    setFadeClass("fade-out");
+                    // Wait for animation (180-200ms based on CSS transition) then set to hidden state
+                    timer = setTimeout(() => {
+                        setFadeClass("hidden");
+                    }, 200);
+                }
+            }
+            return () => clearTimeout(timer);
+        }, [isVisible, fadeClass]);
+
+        // Animation CSS
+        useEffect(() => {
+            if (typeof document !== "undefined" && !document.getElementById("modal-animation-style")) {
+                const style = document.createElement("style");
+                style.id = "modal-animation-style";
+                style.innerHTML = `
+                .fade-in { opacity: 1 !important; transform: scale(1) !important; transition: opacity 200ms cubic-bezier(0.65,0,0.35,1),transform 200ms cubic-bezier(0.65,0,0.35,1);}
+                .fade-out { opacity: 0 !important; transform: scale(0.93) !important; transition: opacity 180ms cubic-bezier(0.65,0,0.35,1),transform 180ms cubic-bezier(0.65,0,0.35,1);}
+                `;
+                document.head.appendChild(style);
+            }
+        }, []);
+
+        // FIX: The component only renders if it is visible or fading out
+        if (fadeClass === 'hidden') return null;
 
         /* --------------------------- Helpers -------------------------------- */
 
         const update = (field: string, value: any) => {
             setFormData((prev) => ({ ...prev, [field]: value }));
+            setError(null);
+        };
+
+        const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+            const file = e.target.files && e.target.files[0];
+            if (file) {
+                update("restaurantImage", file);
+                setImagePreview(URL.createObjectURL(file));
+            } else {
+                update("restaurantImage", null);
+                setImagePreview(null);
+            }
         };
 
         const addKeyValuePair = () => {
@@ -77,66 +127,107 @@ export const CreatePostModal = memo(
         };
 
         /* --------------------------- Submit -------------------------------- */
-
         const handleSubmit = async () => {
             if (!formData.restaurantName.trim() || !formData.description.trim()) {
-                alert("Restaurant name and description are required.");
+                setError("Restaurant name and description are required.");
                 return;
             }
-
+            if (!formData.restaurantImage) {
+                setError("Please select a Restaurant image.");
+                return;
+            }
             setIsSubmitting(true);
 
             try {
                 const auth = await isAuthenticated();
                 const userId = auth?.userId;
 
-                const body = {
-                    data: {
-                        restaurantName: formData.restaurantName,
-                        description: formData.description,
-                        itemsToPromote: formData.itemsToPromote,
-                        minFollowers: formData.minFollowers,
-                        minFollowersUnit: formData.minFollowersUnit,
-                        keyValuePairs: formData.keyValuePairs,
-                        restaurantImage: formData.restaurantImageUrl,
-                        googleMapsLink: formData.googleMapsLink,
-                        address: formData.address,
-                        guidelines: formData.guidelines,
-                        category: "Food",
-                    },
-                    user_id: userId,
+                const fd = new FormData();
+                const payload = {
+                    restaurantName: formData.restaurantName,
+                    description: formData.description,
+                    itemsToPromote: formData.itemsToPromote,
+                    minFollowers: formData.minFollowers,
+                    minFollowersUnit: formData.minFollowersUnit,
+                    keyValuePairs: formData.keyValuePairs,
+                    googleMapsLink: formData.googleMapsLink,
+                    address: formData.address,
+                    guidelines: formData.guidelines,
+                    category: "Food",
                 };
+                fd.append('data', JSON.stringify(payload));
+                fd.append('user_id', userId || '');
+                // formData.restaurantImage is guaranteed to be File here due to check above
+                fd.append('file', formData.restaurantImage);
 
-                const response = await marketapi.post("posts", body);
+                const response = await fetch('https://marketapi.owlit.in/posts', {
+                    method: 'POST',
+                    body: fd,
+                });
 
-                if (!response.success) {
-                    alert(response.message || "Failed to create post.");
+                const result = await response.json();
+
+                if (!result.success) {
+                    setError(result.message || "Failed to create post.");
                     setIsSubmitting(false);
                     return;
                 }
 
-                onSubmit(body.data);
-                setFormData(INITIAL_FORM);
+                // Request parent to turn off isVisible prop (triggers animation/unmount via useEffect)
                 onClose();
+
+                // Reset state after animation duration
+                setTimeout(() => {
+                    setFormData(INITIAL_FORM);
+                    setImagePreview(null);
+                    setIsSubmitting(false);
+                    onSubmit(payload);
+                }, 200);
             } catch (err) {
                 console.error("Error posting:", err);
-                alert("Something went wrong.");
-            } finally {
+                setError("Something went wrong.");
                 setIsSubmitting(false);
             }
         };
 
-        if (!isVisible) return null;
-
         /* --------------------------- Render UI -------------------------------- */
 
         return (
-            <div style={styles.overlay} onClick={onClose}>
-                <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div
+                style={{ ...styles.overlay, pointerEvents: isSubmitting ? "none" : "auto" }}
+                className={fadeClass}
+                onClick={() => {
+                    // Manual close relies on onClose prop changing isVisible state
+                    onClose();
+                }}
+            >
+                <div
+                    style={{
+                        ...styles.modal,
+                        pointerEvents: isSubmitting ? "none" : "auto",
+                        transition: "box-shadow 0.18s cubic-bezier(.65,0,.35,1)",
+                        boxShadow: fadeClass === "fade-in" ? "0 8px 48px rgba(0,0,0,.45)" : "0 0 0 rgba(0,0,0,0.00)",
+                    }}
+                    className={fadeClass}
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <h2 style={styles.title}>
                         Create Restaurant Promotion Campaign
                     </h2>
-
+                    {error && (
+                        <div style={{
+                            color: "#ff5974",
+                            background: "rgba(255,90,120,0.07)",
+                            fontWeight: 500,
+                            padding: "9px 12px",
+                            marginBottom: 12,
+                            borderRadius: 7,
+                            fontSize: "15px",
+                            textAlign: "center"
+                        }}>
+                            {error}
+                        </div>
+                    )}
                     {/* Restaurant Name */}
                     <div style={styles.field}>
                         <label style={styles.label}>Restaurant Name *</label>
@@ -147,7 +238,6 @@ export const CreatePostModal = memo(
                             onChange={(e) => update("restaurantName", e.target.value)}
                         />
                     </div>
-
                     {/* Description */}
                     <div style={styles.field}>
                         <label style={styles.label}>Description *</label>
@@ -158,7 +248,6 @@ export const CreatePostModal = memo(
                             rows={3}
                         />
                     </div>
-
                     {/* Items */}
                     <div style={styles.field}>
                         <label style={styles.label}>Items to be promoted</label>
@@ -169,11 +258,9 @@ export const CreatePostModal = memo(
                             onChange={(e) => update("itemsToPromote", e.target.value)}
                         />
                     </div>
-
                     {/* Followers */}
                     <div style={styles.field}>
                         <label style={styles.label}>Minimum Followers</label>
-
                         <div style={{ display: "flex", gap: 8 }}>
                             <input
                                 type="number"
@@ -198,11 +285,9 @@ export const CreatePostModal = memo(
                             </select>
                         </div>
                     </div>
-
                     {/* KEY VALUE PAIRS */}
                     <div style={styles.field}>
                         <label style={styles.label}>Performance Metrics</label>
-
                         {formData.keyValuePairs.map((pair, idx) => (
                             <div key={idx} style={styles.metricRow}>
                                 <select
@@ -249,7 +334,6 @@ export const CreatePostModal = memo(
                                         updateKeyValuePair(idx, "unit", e.target.value)
                                     }
                                 >
-                                    <option value="">-</option>
                                     <option value="K">K</option>
                                     <option value="M">M</option>
                                     <option value="B">B</option>
@@ -262,7 +346,7 @@ export const CreatePostModal = memo(
                                     onChange={(e) =>
                                         updateKeyValuePair(idx, "reward", e.target.value)
                                     }
-                                    placeholder="$25"
+                                    placeholder="Rs.25"
                                 />
 
                                 <button
@@ -278,18 +362,31 @@ export const CreatePostModal = memo(
                             + Add Metric
                         </button>
                     </div>
-
-                    {/* Restaurant Image */}
+                    {/* Restaurant Image Picker */}
                     <div style={styles.field}>
-                        <label style={styles.label}>Restaurant Image URL</label>
+                        <label style={styles.label}>Restaurant Image <span style={{ color: "#fa4848" }}>*</span></label>
                         <input
-                            type="url"
+                            type="file"
+                            accept="image/*"
                             style={styles.input}
-                            value={formData.restaurantImageUrl}
-                            onChange={(e) => update("restaurantImageUrl", e.target.value)}
+                            onChange={handleImageChange}
+                            disabled={isSubmitting}
                         />
+                        {imagePreview && (
+                            <img
+                                src={imagePreview}
+                                alt="Preview"
+                                style={{
+                                    width: "100%",
+                                    maxWidth: 200,
+                                    borderRadius: 12,
+                                    marginTop: 8,
+                                    alignSelf: "center",
+                                    opacity: isSubmitting ? 0.5 : 1
+                                }}
+                            />
+                        )}
                     </div>
-
                     {/* Maps */}
                     <div style={styles.field}>
                         <label style={styles.label}>Google Maps Link</label>
@@ -298,9 +395,9 @@ export const CreatePostModal = memo(
                             style={styles.input}
                             value={formData.googleMapsLink}
                             onChange={(e) => update("googleMapsLink", e.target.value)}
+                            disabled={isSubmitting}
                         />
                     </div>
-
                     {/* Address */}
                     <div style={styles.field}>
                         <label style={styles.label}>Restaurant Address</label>
@@ -309,9 +406,9 @@ export const CreatePostModal = memo(
                             value={formData.address}
                             onChange={(e) => update("address", e.target.value)}
                             rows={2}
+                            disabled={isSubmitting}
                         />
                     </div>
-
                     {/* Guidelines */}
                     <div style={styles.field}>
                         <label style={styles.label}>Guidelines</label>
@@ -321,19 +418,20 @@ export const CreatePostModal = memo(
                             onChange={(e) => update("guidelines", e.target.value)}
                             rows={6}
                             placeholder="Enter guidelines, one per line"
+                            disabled={isSubmitting}
                         />
                     </div>
-
                     {/* Actions */}
                     <div style={styles.actions}>
                         <button
                             style={styles.cancelButton}
-                            onClick={onClose}
+                            onClick={() => {
+                                onClose();
+                            }}
                             disabled={isSubmitting}
                         >
                             Cancel
                         </button>
-
                         <button
                             style={styles.submitButton}
                             onClick={handleSubmit}
@@ -349,12 +447,12 @@ export const CreatePostModal = memo(
 );
 
 /* -------------------------------------------------------------------------- */
-/*                                    STYLES                                   */
+/* STYLES                                  */
 /* -------------------------------------------------------------------------- */
 
 const styles = {
     overlay: {
-        position: "fixed" as const,
+        position: "fixed", // Removed 'as const'
         inset: 0,
         zIndex: 1300,
         display: "flex",
@@ -362,6 +460,8 @@ const styles = {
         alignItems: "center",
         background: "rgba(0,0,0,0.94)",
         padding: 16,
+        opacity: 0,
+        transform: "scale(0.95)",
     },
     modal: {
         backgroundColor: COLORS.background,
@@ -372,49 +472,24 @@ const styles = {
         overflowY: "auto",
         padding: 32,
         display: "flex",
-        flexDirection: "column",
+        flexDirection: "column", // Removed 'as const'
         alignItems: "stretch",
         boxShadow: "0 8px 48px rgba(0,0,0,.45)",
-
-        /* 📱 Mobile — keep narrow & compact */
-        ...(typeof window !== "undefined" && window.innerWidth < 640
-            ? {
-                width: "95%",
-                maxWidth: "95%",
-                padding: 22,
-            }
-            : {}),
-
-        /* 💻 Laptop screens — MAKE IT WIDER */
-        ...(typeof window !== "undefined" &&
-        window.innerWidth >= 640 &&
-        window.innerWidth < 1280
-            ? {
-                width: "80%",   // much wider
-                maxWidth: 700,  // expanded width
-            }
-            : {}),
-
-        /* 🖥 Desktop large screens */
-        ...(typeof window !== "undefined" && window.innerWidth >= 1280
-            ? {
-                width: "70%",
-                maxWidth: 780,
-            }
-            : {}),
+        opacity: 1,
+        transform: "scale(1)",
+        transition: "none",
     },
-
     title: {
         color: COLORS.instagram.red,
         fontWeight: 500,
         fontSize: 25,
         margin: "0 0 18px 0",
-        textAlign: "center" as const,
+        textAlign: "center", // Removed 'as const'
         letterSpacing: 0.1,
     },
     field: {
         display: "flex",
-        flexDirection: "column" as const,
+        flexDirection: "column", // Removed 'as const'
         gap: 6,
         marginBottom: 16,
     },
@@ -442,13 +517,13 @@ const styles = {
         marginBottom: 12,
         fontSize: 15,
         outline: "none",
-        resize: "vertical" as const,
-        textAlign: "left" as const,
+        resize: "vertical", // Removed 'as const'
+        textAlign: "left", // Removed 'as const'
         lineHeight: 1.4,
     },
     metricRow: {
         display: "flex",
-        flexDirection: "row" as const,
+        flexDirection: "row", // Removed 'as const'
         gap: 8,
         marginBottom: 6,
     },
@@ -536,7 +611,7 @@ const styles = {
     },
     actions: {
         display: "flex",
-        flexDirection: "row" as const,
+        flexDirection: "row", // Removed 'as const'
         justifyContent: "flex-end",
         gap: 8,
         paddingTop: 7,
@@ -559,6 +634,5 @@ const styles = {
         padding: "10px 18px",
         cursor: "pointer",
         boxShadow: "0 4px 18px rgba(0,0,0,0.10)",
-    },
+    }
 };
-

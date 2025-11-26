@@ -155,12 +155,29 @@ const RestaurantCard = memo(
 
         return (
             <View style={[styles.card, { width }]}>
-                <Image
-                    source={{ uri: item.image || item.restaurantImage }}
-                    style={styles.cardImg}
-                />
+                {Platform.OS === "web" ? (
+                    <img
+                        src={item.image || item.restaurantImage || ""}
+                        style={{
+                            width: "100%",
+                            height: 160,
+                            objectFit: "cover",
+                            borderTopLeftRadius: 14,
+                            borderTopRightRadius: 14,
+                            background: "#222"
+                        }}
+                        alt={item.restaurantName || "Restaurant"}
+                        onError={e => { (e.target as HTMLImageElement).src = "https://ik.imagekit.io/owlit/agency/passport_photo_HMktjeYkg.jpg" }}
+                    />
+                ) : (
+                    <Image
+                        source={{ uri: item.image || item.restaurantImage || "" }}
+                        style={styles.cardImg}
+                        defaultSource={require("../../assets/images/influencer.png")}
+                    />
+                )}
 
-                <View style={styles.cardBody}>
+
                     <Text style={styles.cardName}>{item.restaurantName}</Text>
                     <Text style={styles.cardItem}>
                         {item.itemsToPromote
@@ -194,29 +211,21 @@ const RestaurantCard = memo(
                     {/*        ⏰ Due: {new Date(item.lastDate).toLocaleDateString()}*/}
                     {/*    </Text>*/}
                     {/*) : null}*/}
-                </View>
 
-
-                {/* Instagram Gradient Button */}
-                <Pressable
-                    onPressIn={() => setPressed(true)}
-                    onPressOut={() => setPressed(false)}
-                    onPress={onAutomation}
-                    style={[
-                        styles.automationBtn,
-                        {
-                            transform: [{ scale: pressed ? 0.92 : 1 }],
-                            ...(Platform.OS === "web"
-                                ? {
-                                    backgroundColor:
-                                        COLORS.instagram.red,
-                                }
-                                : { backgroundColor: COLORS.primary }),
-                        },
-                    ]}
-                >
-                    <Text style={{ color: "white", fontSize: 16 }}>→</Text>
-                </Pressable>
+                    <Pressable
+                        onPressIn={() => setPressed(true)}
+                        onPressOut={() => setPressed(false)}
+                        onPress={onAutomation}
+                        style={[
+                            styles.automationBtn,
+                            { transform: [{ scale: pressed ? 0.92 : 1 }] },
+                            Platform.OS === "web"
+                                ? { backgroundColor: COLORS.instagram.red }
+                                : { backgroundColor: COLORS.primary }
+                        ]}
+                    >
+                        <Text style={{ color: "white", fontSize: 16 }}>→</Text>
+                    </Pressable>
             </View>
         );
     }
@@ -443,7 +452,8 @@ const styles = StyleSheet.create({
         padding: 14,
         borderRadius: 25,
         backgroundColor: COLORS.surface,
-        border: `1px solid ${COLORS.surfaceLight}`,
+        borderWidth: 1,
+        borderColor: COLORS.surfaceLight,
         color: COLORS.white,
         fontSize: 15,
     },
@@ -543,7 +553,7 @@ const styles = StyleSheet.create({
 
     /* FAB */
     fab: {
-        position: "fixed",
+        position: "absolute", // 'fixed' not valid for React Native StyleSheet
         right: 20,
         width: 40,
         height: 40,
@@ -551,7 +561,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         borderWidth: 2,
-        borderColor:COLORS.instagram.red,
+        borderColor: COLORS.instagram.red,
         backgroundColor: COLORS.background,
         zIndex: 9999,
         shadowColor: "#000",
