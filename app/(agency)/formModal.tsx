@@ -165,10 +165,9 @@ export const CreatePostModal = memo(
                     body: fd,
                 });
 
-                const result = await response.json();
 
-                if (!result.success) {
-                    setError(result.message || "Failed to create post.");
+                if (response.status!=200) {
+                    setError("Failed to create post.");
                     setIsSubmitting(false);
                     return;
                 }
