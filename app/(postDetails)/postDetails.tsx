@@ -265,13 +265,10 @@ const RestaurantDetailsScreen: React.FC = () => {
             <View style={localStyles.header}>
                 <Text style={localStyles.headerTitle}>Restaurant Details</Text>
             </View>
-
-            <View style={[localStyles.contentContainer, mobileLayout ? { flexDirection: 'column' } : { flexDirection: 'row' }]}>
-
-                {/* --- LEFT COLUMN: DETAILS --- */}
+            {mobileLayout ? (
                 <ScrollView
-                    style={localStyles.leftColumn}
-                    contentContainerStyle={{ padding: 24, paddingBottom: 60 }}
+                    style={{ flex: 1, backgroundColor: COLORS.background }}
+                    contentContainerStyle={{ padding: 18, paddingBottom: 60 }}
                 >
                     {/* Hero Section */}
                     <View style={localStyles.heroSection}>
@@ -332,13 +329,120 @@ const RestaurantDetailsScreen: React.FC = () => {
                         <Text style={localStyles.sectionTitle}>Guidelines</Text>
                         <Text style={localStyles.text}>{post.guidelines}</Text>
                     </View>
+
+                    {/* Action Buttons */}
+                    <View style={[
+                        localStyles.actionRow,
+                        { flexDirection: 'column', gap: 8 }
+                    ]}>
+                        <TouchableOpacity
+                            style={localStyles.editButton}
+                            onPress={handleEditPress}
+                            disabled={editLoading}
+                        >
+                            {editLoading ? (
+                                <ActivityIndicator color={COLORS.white} size="small" />
+                            ) : (
+                                <Text style={localStyles.btnTextWhite}>Edit Campaign</Text>
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={localStyles.deleteButton} onPress={() => setPauseVisible(true)}>
+                            <Text style={localStyles.btnTextWhite}>
+                                {post.status === "active" ? "Pause Campaign" : "Resume Campaign"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Stats Placeholders */}
+                    <Text style={localStyles.statsTitle}>Influencers Enrolled</Text>
+                    {["John Doe", "Jane Smith", "Alex Kim"].map((name, idx) => (
+                        <View key={idx} style={localStyles.userCard}>
+                            <Text style={localStyles.userCardText}>{name}</Text>
+                        </View>
+                    ))}
+
+                    <View style={{ height: 24 }} />
+
+                    <Text style={localStyles.statsTitle}>Influencers Completed</Text>
+                    {["Sara Novak", "Mohammed Khan"].map((name, idx) => (
+                        <View key={idx} style={localStyles.userCard}>
+                            <Text style={localStyles.userCardText}>{name}</Text>
+                        </View>
+                    ))}
                 </ScrollView>
+            ) : (
+                <View style={[localStyles.contentContainer, { flexDirection: 'row' }]}>
+                    {/* --- LEFT COLUMN: DETAILS --- */}
+                    <ScrollView
+                        style={localStyles.leftColumn}
+                        contentContainerStyle={{ padding: 24, paddingBottom: 60 }}
+                    >
+                        {/* Hero Section */}
+                        <View style={localStyles.heroSection}>
+                            <Image
+                                source={{ uri: post.restaurantImage || 'https://via.placeholder.com/320x140?text=No+Image' }}
+                                style={localStyles.restaurantImage}
+                                resizeMode="cover"
+                            />
+                            <Text style={localStyles.restaurantName}>{post.restaurantName}</Text>
+                            {post.category && <Text style={localStyles.categoryBadge}>{post.category}</Text>}
+                            <Text style={localStyles.description}>{post.description}</Text>
+                        </View>
 
-                {/* Vertical Divider (Desktop Only) */}
-                {!mobileLayout && <View style={localStyles.verticalDivider} />}
+                        {/* Location */}
+                        {(post.address || post.googleMapsLink) && (
+                            <View style={localStyles.section}>
+                                <Text style={localStyles.sectionTitle}>Location</Text>
+                                <View style={localStyles.row}>
+                                    <Ionicons name="location-outline" size={20} color={COLORS.white} style={{ marginRight: 6 }} />
+                                    <Text style={localStyles.text}>{post.address}</Text>
+                                </View>
+                                {post.googleMapsLink ? (
+                                    <TouchableOpacity onPress={() => Linking.openURL(post.googleMapsLink)}>
+                                        <Text style={localStyles.linkText}>Open in Google Maps</Text>
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
+                        )}
 
-                {/* --- RIGHT COLUMN: ACTIONS & STATS --- */}
-                {!mobileLayout && (
+                        {/* Rewards */}
+                        {post.keyValuePairs.length > 0 && (
+                            <View style={localStyles.section}>
+                                <Text style={localStyles.sectionTitle}>Rewards & Criteria</Text>
+                                <View style={localStyles.chipContainer}>
+                                    {post.keyValuePairs.map((pair, idx) => renderRewardChip(pair, idx))}
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Items */}
+                        {post.itemsToPromote && (
+                            <View style={localStyles.section}>
+                                <Text style={localStyles.sectionTitle}>Items to Promote</Text>
+                                <Text style={localStyles.text}>{post.itemsToPromote}</Text>
+                            </View>
+                        )}
+
+                        {/* Requirements */}
+                        <View style={localStyles.section}>
+                            <Text style={localStyles.sectionTitle}>Eligibility</Text>
+                            <Text style={localStyles.text}>
+                                Min. Followers: {post.minFollowers}{post.minFollowersUnit}
+                            </Text>
+                        </View>
+
+                        {/* Guidelines */}
+                        <View style={localStyles.section}>
+                            <Text style={localStyles.sectionTitle}>Guidelines</Text>
+                            <Text style={localStyles.text}>{post.guidelines}</Text>
+                        </View>
+                    </ScrollView>
+
+                    {/* Vertical Divider (Desktop Only) */}
+                    <View style={localStyles.verticalDivider} />
+
+                    {/* --- RIGHT COLUMN: ACTIONS & STATS --- */}
                     <ScrollView
                         style={localStyles.rightColumn}
                         contentContainerStyle={{ padding: 28, paddingBottom: 60 }}
@@ -362,7 +466,6 @@ const RestaurantDetailsScreen: React.FC = () => {
                                     {post.status === "active" ? "Pause Campaign" : "Resume Campaign"}
                                 </Text>
                             </TouchableOpacity>
-
                         </View>
 
                         <View style={localStyles.dividerLine} />
@@ -384,8 +487,8 @@ const RestaurantDetailsScreen: React.FC = () => {
                             </View>
                         ))}
                     </ScrollView>
-                )}
-            </View>
+                </View>
+            )}
 
             {/* --- MODAL --- */}
             {editModalVisible && (
