@@ -492,6 +492,8 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         backgroundColor: COLORS.surfaceLight,
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.surfaceLight
     },
 
     /* CARD */
