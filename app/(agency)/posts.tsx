@@ -20,16 +20,17 @@ import {
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { COLORS } from "@/constants/theme";
-import { marketapi } from "../../utils/api";
+import { marketapi,localapi } from "../../utils/api";
 import { CreatePostModal } from "./formModal";
-import {isAuthenticated} from "@/app/utils/auth";
-import {AutomationButton} from "../components/AutomationButton"
+import { isAuthenticated } from "@/app/utils/auth";
+// import { AutomationButton } from "../components/AutomationButton"
 
 /* -------------------------------------------------------------------------- */
-/*                                   Types                                    */
+/* Types                                    */
 /* -------------------------------------------------------------------------- */
 
 type APIRestaurantPost = {
+    _id:string;
     restaurantName: string;
     description: string;
     itemsToPromote?: string;
@@ -49,14 +50,15 @@ type APIRestaurantPost = {
     lastDate?: string;
     image?: string;
     category?: string;
-    post_id?: string;
+    postId?: string;
+    status?:string
 };
 
 const moneyNum = (s?: string) =>
     s ? parseFloat(String(s).replace(/[^0-9.]/g, "")) || 0 : 0;
 
 /* -------------------------------------------------------------------------- */
-/*                                Header Component                            */
+/* Header Component                            */
 /* -------------------------------------------------------------------------- */
 
 const Header = memo(
@@ -94,11 +96,19 @@ const Header = memo(
                 />
 
                 {/* Sort */}
-                <View style={[styles.sortContainer, { width: isDesktop ? 220 : "100%" }]}>
+                <View style={[
+                    styles.sortContainer,
+                    {
+                        width: isDesktop ? 220 : "100%",
+                        // Only add margin top on mobile to separate it from search
+                        marginTop: isDesktop ? 0 : 10
+                    }
+                ]}>
                     {Platform.OS === "web" ? (
                         <select
                             value={sort}
                             onChange={(e) => setSort(e.target.value)}
+                            // @ts-ignore
                             style={styles.webSelect}
                         >
                             <option value="newest">Newest First</option>
@@ -134,7 +144,7 @@ const Header = memo(
 );
 
 /* -------------------------------------------------------------------------- */
-/*                           Restaurant Card Component                        */
+/* Restaurant Card Component                        */
 /* -------------------------------------------------------------------------- */
 
 const RestaurantCard = memo(
@@ -178,14 +188,35 @@ const RestaurantCard = memo(
                 )}
 
 
-                    <Text style={styles.cardName}>{item.restaurantName}</Text>
-                    <Text style={styles.cardItem}>
-                        {item.itemsToPromote
-                            ? item.itemsToPromote.split(",")[0] + "..."
-                            : "Special Offer"}
+                <View style={styles.cardBody}>
+                    <Text style={styles.cardName} numberOfLines={1} ellipsizeMode="tail">
+                        {item.restaurantName || "Untitled"}
+                    </Text>
+                    <Text style={styles.cardItem} numberOfLines={2} ellipsizeMode="tail">
+                        {(item.description?.trim() ||
+                            item.itemsToPromote?.split(",")[0] ||
+                            "Special offer").replace(/\s+/g, " ")}
                     </Text>
 
                     <View style={styles.tagRow}>
+                        {/* STATUS BADGE */}
+                        {item.status && (
+                            <View style={[
+                                styles.statusTag,
+                                item.status === "active"
+                                    ? styles.statusActive
+                                    : item.status === "pause"
+                                    ? styles.statusPaused
+                                    : styles.statusStopped
+                            ]}>
+                                <Text style={styles.statusTagText}>
+                                    {item.status === "active" && "Active"}
+                                    {item.status === "pause" && "Paused"}
+                                    {item.status === "stopped" && "Stopped"}
+                                    {item.status !== "active" && item.status !== "pause" && item.status !== "stopped" && item.status}
+                                </Text>
+                            </View>
+                        )}
                         {item.minFollowers && item.minFollowersUnit && (
                             <View style={styles.followTag}>
                                 <Text style={styles.followTagText}>
@@ -203,36 +234,33 @@ const RestaurantCard = memo(
                     </View>
 
                     {item.address ? (
-                        <Text style={styles.locationText}>📍 {item.address}</Text>
+                        <Text style={styles.locationText} numberOfLines={2} ellipsizeMode="tail">
+                            📍 {item.address}
+                        </Text>
                     ) : null}
+                </View>
 
-                    {/*{item.lastDate ? (*/}
-                    {/*    <Text style={styles.deadlineText}>*/}
-                    {/*        ⏰ Due: {new Date(item.lastDate).toLocaleDateString()}*/}
-                    {/*    </Text>*/}
-                    {/*) : null}*/}
-
-                    <Pressable
-                        onPressIn={() => setPressed(true)}
-                        onPressOut={() => setPressed(false)}
-                        onPress={onAutomation}
-                        style={[
-                            styles.automationBtn,
-                            { transform: [{ scale: pressed ? 0.92 : 1 }] },
-                            Platform.OS === "web"
-                                ? { backgroundColor: COLORS.instagram.red }
-                                : { backgroundColor: COLORS.primary }
-                        ]}
-                    >
-                        <Text style={{ color: "white", fontSize: 16 }}>→</Text>
-                    </Pressable>
+                <Pressable
+                    onPressIn={() => setPressed(true)}
+                    onPressOut={() => setPressed(false)}
+                    onPress={onAutomation}
+                    style={[
+                        styles.automationBtn,
+                        { transform: [{ scale: pressed ? 0.92 : 1 }] },
+                        Platform.OS === "web"
+                            ? { backgroundColor: COLORS.instagram.red }
+                            : { backgroundColor: COLORS.primary }
+                    ]}
+                >
+                    <Text style={{ color: "white", fontSize: 16 }}>→</Text>
+                </Pressable>
             </View>
         );
     }
 );
 
 /* -------------------------------------------------------------------------- */
-/*                                 MAIN SCREEN                                */
+/* MAIN SCREEN                                */
 /* -------------------------------------------------------------------------- */
 
 export default function RestaurantOffersGridScreen() {
@@ -248,7 +276,7 @@ export default function RestaurantOffersGridScreen() {
         desktop: 5,
         laptop: 3,
         tablet: 2,
-        mobile:2,
+        mobile: 2,
     };
 
     const GUTTER = 14;
@@ -262,20 +290,8 @@ export default function RestaurantOffersGridScreen() {
     else columns = COLS.mobile;
 
     const totalGap = GUTTER * (columns - 1);
-
     const cardWidth = (width - H_PADDING * 2 - totalGap) / columns;
-
-
-    /* -------- Fixed Grid Layout (responsive columns) -------- */
     const gap = 14;
-    // const cardWidth =
-    //     width > 1150
-    //         ? (width - 80 - gap * 3) / 4
-    //         : width > 900
-    //             ? (width - 60 - gap * 2) / 3
-    //             : width > 600
-    //                 ? (width - 40 - gap * 1) / 2
-    //                 : width - 20;
 
     /* ---------------- Fetch posts ---------------- */
     const fetchRestaurants = useCallback(async () => {
@@ -284,7 +300,15 @@ export default function RestaurantOffersGridScreen() {
             const auth = await isAuthenticated();
             const uid = auth?.userId;
             const { success, data } = await marketapi.get("posts?user_id=" + uid);
-            setRestaurants(success ? data?.data?.posts || [] : []);
+            let normalizedPosts: any[] = [];
+            if (success && data) {
+                if (Array.isArray(data.posts)) {
+                    normalizedPosts = data.posts;
+                } else if (data.posts && typeof data.posts === "object") {
+                    normalizedPosts = [data.posts];
+                }
+            }
+            setRestaurants(normalizedPosts);
         } catch {
             setRestaurants([]);
         } finally {
@@ -341,7 +365,7 @@ export default function RestaurantOffersGridScreen() {
                         (b.lastDate ? new Date(b.lastDate).getTime() : Infinity)
                     );
                 default:
-                    return String(b.post_id || "").localeCompare(String(a.post_id || ""));
+                    return String(b.postId || "").localeCompare(String(a.postId || ""));
             }
         });
 
@@ -353,13 +377,9 @@ export default function RestaurantOffersGridScreen() {
         const uid = auth?.userId;
 
         router.push({
-            pathname: "/(automation)/automation",
+            pathname: "/postDetails",
             params: {
-                id: uid,
-                mediaType: "IMAGE",
-                mediaUrl: r.restaurantImage || r.image,
-                postId: r.post_id,
-                thumbnail: r.restaurantImage || r.image,
+                postId: r._id,
             },
         });
     };
@@ -388,7 +408,7 @@ export default function RestaurantOffersGridScreen() {
                     >
                         {filtered.map((item) => (
                             <RestaurantCard
-                                key={item.post_id || item.restaurantName}
+                                key={item.postId || item.restaurantName}
                                 item={item}
                                 width={cardWidth}
                                 onAutomation={() => automate(item)}
@@ -422,7 +442,7 @@ export default function RestaurantOffersGridScreen() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                   STYLES                                   */
+/* STYLES                                   */
 /* -------------------------------------------------------------------------- */
 
 const styles = StyleSheet.create({
@@ -437,7 +457,8 @@ const styles = StyleSheet.create({
     },
     searchBox: {
         backgroundColor: COLORS.surface,
-        padding: 14,
+        paddingHorizontal: 16, // Matches the spacing of the sort box
+        height: 54,
         borderRadius: 25,
         borderWidth: 1,
         borderColor: COLORS.surfaceLight,
@@ -445,22 +466,32 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
     sortContainer: {
-        marginTop: 10,
+        // Margin top handled in component logic for responsiveness
+        justifyContent: 'center',
     },
     webSelect: {
         width: "100%",
-        padding: 14,
+        height: 54,
+        // FIX: Use explicit paddingLeft for HTML select elements, paddingHorizontal may not apply
+        paddingLeft: 16,
+        paddingRight: 16,
         borderRadius: 25,
         backgroundColor: COLORS.surface,
         borderWidth: 1,
         borderColor: COLORS.surfaceLight,
         color: COLORS.white,
-        fontSize: 15,
-    },
+        fontSize: 16,
+        appearance: 'none',
+        MozAppearance: 'none',
+        WebkitAppearance: 'none',
+        cursor: 'pointer',
+    } as any,
     mobileSortButton: {
-        padding: 14,
+        height: 54,
+        paddingHorizontal: 16,
         borderRadius: 25,
         backgroundColor: COLORS.surfaceLight,
+        justifyContent: 'center',
     },
 
     /* CARD */
@@ -475,6 +506,7 @@ const styles = StyleSheet.create({
     },
     cardBody: {
         padding: 12,
+        paddingBottom: 56, // keep text clear of the floating action button
     },
     cardName: {
         color: COLORS.white,
@@ -512,16 +544,36 @@ const styles = StyleSheet.create({
         color: COLORS.white,
         fontWeight: "600",
     },
+    /* Status badge styles */
+    statusTag: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        marginRight: 4,
+        minWidth: 54,
+        alignItems: "center",
+    },
+    statusTagText: {
+        fontWeight: "700",
+        fontSize: 12,
+        color: "#fff",
+        textTransform: "uppercase",
+        letterSpacing: 0.25,
+    },
+    statusActive: {
+        backgroundColor: "#16a34a",
+    },
+    statusPaused: {
+        backgroundColor: "#eab308",
+    },
+    statusStopped: {
+        backgroundColor: "#dc2626",
+    },
     locationText: {
         color: COLORS.white,
         marginTop: 4,
         opacity: 0.9,
     },
-    deadlineText: {
-        color: "#fbbf24",
-        marginTop: 4,
-    },
-
     automationBtn: {
         position: "absolute",
         right: 10,
@@ -553,7 +605,7 @@ const styles = StyleSheet.create({
 
     /* FAB */
     fab: {
-        position: "absolute", // 'fixed' not valid for React Native StyleSheet
+        position: "absolute",
         right: 20,
         width: 40,
         height: 40,

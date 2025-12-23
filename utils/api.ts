@@ -6,7 +6,7 @@ const API_URLS = {
     main: 'https://api.owlit.in/',
     auth: 'https://auth.owlit.in/',
     analytics: 'https://analytics.owlit.in/',
-    local: 'http://127.0.0.1:8050/',
+    local: 'http://127.0.0.1:8000/',
 } as const;
 
 type ApiService = keyof typeof API_URLS;
@@ -123,6 +123,59 @@ const createApiMethods = (baseUrl: string) => {
         }
     };
 
+    const putMultipart = async (
+        endpoint: string,
+        fields: Record<string, any>,
+        file?: { uri: string; name: string; type: string } | File | Blob
+    ) => {
+        try {
+            const formData = new FormData();
+
+            // Append arbitrary fields. Object values are JSON stringified.
+            Object.entries(fields || {}).forEach(([key, value]) => {
+                if (value === undefined || value === null) return;
+                if (typeof value === "object") {
+                    formData.append(key, JSON.stringify(value));
+                } else {
+                    formData.append(key, String(value));
+                }
+            });
+
+            // Optional file
+            if (file) {
+                if (Platform.OS === 'web') {
+                    if (file instanceof File || file instanceof Blob) {
+                        formData.append('file', file as any, (file as any as File).name || 'upload.bin');
+                    } else if ((file as any).uri) {
+                        // Fallback: try to fetch blob from uri if provided (rare on web)
+                        // Skipped to avoid CORS surprises; callers should pass File/Blob on web.
+                    }
+                } else {
+                    formData.append('file', {
+                        uri: (file as any).uri,
+                        name: (file as any).name,
+                        type: (file as any).type,
+                    } as any);
+                }
+            }
+
+            const res = await fetch(`${baseUrl}${endpoint}`, {
+                method: 'PUT',
+                headers: { accept: 'application/json' } as any, // Let browser set boundary
+                body: formData,
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const msg = (data as any)?.message || `PUT ${endpoint} failed: ${res.status}`;
+                return { success: false, message: msg, status: res.status };
+            }
+            return { success: true, data };
+        } catch (err: any) {
+            console.error('Multipart API Error:', err?.message || err);
+            return { success: false, message: err?.message || 'Unknown error' };
+        }
+    };
+
     const del = async (endpoint: string, body: any) => {
         try {
             const res = await fetch(`${baseUrl}${endpoint}`, {
@@ -142,7 +195,7 @@ const createApiMethods = (baseUrl: string) => {
         }
     };
 
-    return { get, post, put, postMultipart, del };
+    return { get, post, put, postMultipart, putMultipart, del };
 };
 
 // Create service objects for each backend
