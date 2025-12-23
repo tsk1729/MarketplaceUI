@@ -459,6 +459,8 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.surface,
         paddingHorizontal: 16, // Matches the spacing of the sort box
         height: 54,
+        minHeight: 54,
+        maxHeight: 54,
         borderRadius: 25,
         borderWidth: 1,
         borderColor: COLORS.surfaceLight,
