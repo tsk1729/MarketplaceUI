@@ -160,6 +160,7 @@ const ConnectScreen = () => {
             router.replace('/(Login)/login');
         } catch (error) {
             console.error('Error signing out:', error);
+            router.replace('/(Login)/login');
         }
     };
 
