@@ -214,22 +214,16 @@ export const CreatePostModal = memo(function CreatePostModal({
                     return;
                 }
             } else {
-                // CREATE: keep existing flow using multipart for consistency
-                fd.append("user_id", userId);
-                fd.append("data", JSON.stringify(dataPayload));
-                if (formData.restaurantImage) {
-                    fd.append("file", formData.restaurantImage);
-                }
-                const res = await fetch("http://localhost:8000/posts", {
-                    method: "POST",
-                    headers: {
-                        accept: "application/json",
-                    } as any,
-                    body: fd,
-                });
-                const resJson = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                    setError(resJson?.message || `Failed to create post (${res.status})`);
+                // CREATE: use helper method for multipart POST
+                const fields = {
+                    user_id: userId,
+                    data: dataPayload,
+                };
+                const file = formData.restaurantImage || undefined;
+
+                const { success, message } = await marketapi.postMultipart("posts", fields, file as any);
+                if (!success) {
+                    setError(message || "Failed to create post");
                     setIsSubmitting(false);
                     return;
                 }

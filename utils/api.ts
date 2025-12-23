@@ -77,25 +77,32 @@ const createApiMethods = (baseUrl: string) => {
 
     const postMultipart = async (
         endpoint: string,
-        data: any,
+        fields: Record<string, any>,
         file?: { uri: string; name: string; type: string } | File | Blob
     ) => {
         try {
             const formData = new FormData();
+
+            // Append arbitrary fields. Object values are JSON stringified.
+            Object.entries(fields || {}).forEach(([key, value]) => {
+                if (value === undefined || value === null) return;
+                if (typeof value === "object") {
+                    formData.append(key, JSON.stringify(value));
+                } else {
+                    formData.append(key, String(value));
+                }
+            });
+
+            // Optional file
             if (file) {
                 if (Platform.OS === 'web') {
-                    // If file is already a File or Blob, use it directly
                     if (file instanceof File || file instanceof Blob) {
-                        formData.append('file', file, (file as File).name || 'upload.pdf');
+                        formData.append('file', file as any, (file as any as File).name || 'upload.bin');
                     } else if ((file as any).uri) {
-                        // If file is a DocumentPicker result, fetch as Blob and create File
-                        const response = await fetch((file as any).uri);
-                        const blob = await response.blob();
-                        const fileForForm = new File([blob], (file as any).name || 'upload.pdf', { type: (file as any).type || 'application/pdf' });
-                        formData.append('file', fileForForm);
+                        // Fallback: try to fetch blob from uri if provided (rare on web)
+                        // Skipped to avoid CORS surprises; callers should pass File/Blob on web.
                     }
                 } else {
-                    // Native: file must be { uri, name, type }
                     formData.append('file', {
                         uri: (file as any).uri,
                         name: (file as any).name,
@@ -103,15 +110,13 @@ const createApiMethods = (baseUrl: string) => {
                     } as any);
                 }
             }
-            const url = `${baseUrl}${endpoint}?post_data=${encodeURIComponent(JSON.stringify(data))}`;
-            const res = await fetch(url, {
+
+            const res = await fetch(`${baseUrl}${endpoint}`, {
                 method: 'POST',
-                headers: {
-                    'accept': 'application/json',
-                },
+                headers: { accept: 'application/json' } as any,
                 body: formData,
             });
-            const responseData = await res.json();
+            const responseData = await res.json().catch(() => ({}));
             if (!res.ok) {
                 const msg = responseData?.message || `POST ${endpoint} failed: ${res.status}`;
                 return { success: false, message: msg, status: res.status };
