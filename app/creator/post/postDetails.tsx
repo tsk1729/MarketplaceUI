@@ -79,9 +79,13 @@ const RestaurantDetailsScreen: React.FC = () => {
     const [pauseVisible, setPauseVisible] = useState(false);
 
     // NEW: State to manage submission
-    const [submission, setSubmission] = useState<{link: string}|null>(null);
+    const [submission, setSubmission] = useState<{ link: string; description?: string; verification_status?: string; payment_status?: string } | null>(null);
     const [subStatusLoading, setSubStatusLoading] = useState(true);
     const [showEditForm, setShowEditForm] = useState(false);
+
+    // NEW: Subscription state
+    const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
+    const [subscribeLoading, setSubscribeLoading] = useState(false);
 
     const postId = typeof params.postId === "string" ? params.postId : "";
 
@@ -140,26 +144,79 @@ const RestaurantDetailsScreen: React.FC = () => {
     // Fetch submission status for this user+post
     useEffect(() => {
         let cancelled = false;
-        const fetchSubmission = async () => {
+
+        const checkStatus = async () => {
             setSubStatusLoading(true);
             try {
                 const auth = await isAuthenticated();
-                // Example endpoint; adjust as needed!
-                const res = await marketapi.get(`post/submission?user_id=${auth.userId}&post_id=${postId}`);
-                if (res.success && res.data?.link) {
-                    if (!cancelled) setSubmission({ link: res.data.link });
-                } else {
-                    if (!cancelled) setSubmission(null);
+                if (!auth?.userId) return;
+
+                // API: GET /brands/{user_id}/brand-subscriptions/{post_id}
+                const res = await marketapi.get(`brands/${auth.userId}/brand-subscriptions/${postId}`);
+
+                if (!cancelled) {
+                    if (res.success && res.data) {
+                        // Use response from api
+                        // { "status": boolean, "link": string | null, "description": ... }
+
+                        setIsSubscribed(res.data.status === true);
+
+                        if (res.data.link) {
+                            setSubmission({
+                                link: res.data.link,
+                                description: res.data.description,
+                                verification_status: res.data.verification_status,
+                                payment_status: res.data.payment_status
+                            });
+                        } else {
+                            setSubmission(null);
+                        }
+                    } else {
+                        // Fallback or error state
+                        setIsSubscribed(false);
+                        setSubmission(null);
+                    }
                 }
             } catch (e) {
-                if (!cancelled) setSubmission(null);
+                if (!cancelled) {
+                    setIsSubscribed(false);
+                    setSubmission(null);
+                }
             } finally {
                 if (!cancelled) setSubStatusLoading(false);
             }
         };
-        if (postId) fetchSubmission();
+
+        if (postId) {
+            checkStatus();
+        }
+
         return () => { cancelled = true; };
     }, [postId]);
+
+    const handleSubscribe = async () => {
+        setSubscribeLoading(true);
+        try {
+            const auth = await isAuthenticated();
+            if (!auth?.userId) {
+                alert("You need to be logged in");
+                return;
+            }
+
+            // API: POST /brands/{user_id}/brand-subscriptions?post_id={post_id}
+            const res = await marketapi.post(`brands/${auth.userId}/brand-subscriptions?post_id=${postId}`, {});
+
+            if (res.success) {
+                setIsSubscribed(true);
+            } else {
+                alert("Failed to subscribe: " + (res.message || "Unknown error"));
+            }
+        } catch (e) {
+            alert("Failed to subscribe");
+        } finally {
+            setSubscribeLoading(false);
+        }
+    };
 
     const handleEditSubmit = async (data: any) => {
         // TODO: Implement edit logic
@@ -279,8 +336,9 @@ const RestaurantDetailsScreen: React.FC = () => {
     );
 
     // Right column: Form for submitting/editiing the marketed post link
-    const SubmitLinkForm = ({ initialLink = "", onSubmit, onCancel }: { initialLink?: string, onSubmit: (link:string)=>void, onCancel?:()=>void }) => {
+    const SubmitLinkForm = ({ initialLink = "", initialNotes = "", onSubmit, onCancel }: { initialLink?: string, initialNotes?: string, onSubmit: (link: string, notes: string) => void, onCancel?: () => void }) => {
         const [link, setLink] = useState(initialLink);
+        const [notes, setNotes] = useState(initialNotes);
         const [submitting, setSubmitting] = useState(false);
         const [success, setSuccess] = useState(false);
         const [errorMsg, setErrorMsg] = useState('');
@@ -295,19 +353,42 @@ const RestaurantDetailsScreen: React.FC = () => {
             setErrorMsg('');
             setSuccess(false);
 
-            // TODO: Actual submission logic (API call)
-            // Here simulate and update parent:
-            setTimeout(() => {
+            try {
+                const auth = await isAuthenticated();
+                if (!auth?.userId) {
+                    setErrorMsg("You need to be logged in to submit.");
+                    setSubmitting(false);
+                    return;
+                }
+
+                // API: POST /influencer/{user_id}/proofs?post_id={post_id}
+                const res = await marketapi.post(`influencer/${auth.userId}/proofs?post_id=${postId}`, {
+                    description: notes,
+                    link: link
+                });
+
+                if (res.success) {
+                    setSuccess(true);
+                    setErrorMsg('');
+                    // Slight delay to show success message before closing/refreshing
+                    setTimeout(() => {
+                        onSubmit(link, notes);
+                        setSubmitting(false);
+                    }, 1000);
+                } else {
+                    setErrorMsg(res.message || "Failed to submit proof.");
+                    setSubmitting(false);
+                }
+            } catch (e: any) {
+                setErrorMsg(e?.message || "An unexpected error occurred.");
                 setSubmitting(false);
-                setSuccess(true);
-                setErrorMsg('');
-                onSubmit(link);
-            }, 800);
+            }
         };
 
         return (
             <View>
                 <Text style={localStyles.restaurantName}>{initialLink ? "Edit Your Submitted Link" : "Submit Your Marketed Post Link"}</Text>
+
                 <Text style={localStyles.formLabel}>Post Link</Text>
                 <TextInput
                     style={localStyles.textInput}
@@ -320,6 +401,19 @@ const RestaurantDetailsScreen: React.FC = () => {
                     keyboardType="url"
                     editable={!submitting}
                 />
+
+                <Text style={localStyles.formLabel}>Notes</Text>
+                <TextInput
+                    style={[localStyles.textInput, { height: 120, textAlignVertical: 'top' }]}
+                    placeholder="Add any notes (optional)"
+                    placeholderTextColor={COLORS.grey}
+                    value={notes}
+                    onChangeText={setNotes}
+                    multiline
+                    numberOfLines={3}
+                    editable={!submitting}
+                />
+
                 <TouchableOpacity
                     style={[
                         localStyles.submitBtn,
@@ -338,8 +432,8 @@ const RestaurantDetailsScreen: React.FC = () => {
                     )}
                 </TouchableOpacity>
                 {onCancel ? (
-                    <TouchableOpacity style={{marginTop:12, alignItems:'center'}} onPress={onCancel}>
-                        <Text style={{color:COLORS.grey}}>Cancel</Text>
+                    <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={onCancel}>
+                        <Text style={{ color: COLORS.grey }}>Cancel</Text>
                     </TouchableOpacity>
                 ) : null}
                 {errorMsg ? (
@@ -352,42 +446,134 @@ const RestaurantDetailsScreen: React.FC = () => {
         );
     };
 
+    // NEW: Tracker Component
+    const TrackingSteps = ({ status, link, verificationStatus, paymentStatus }: { status: boolean | null, link: string | undefined, verificationStatus: string | undefined, paymentStatus: string | undefined }) => {
+        const steps = [
+            { label: "Subscribed", active: !!status },
+            { label: "Proof Submitted", active: !!link },
+            { label: "Review Completed", active: verificationStatus === "approved" },
+            { label: "Credited Money", active: paymentStatus === "paid" }
+        ];
+
+        return (
+            <View style={{ marginBottom: 24 }}>
+                <Text style={localStyles.sectionTitle}>Status Tracker</Text>
+                <View style={{ marginLeft: 8 }}>
+                    {steps.map((step, idx) => (
+                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                            <View style={{ alignItems: 'center', marginRight: 12 }}>
+                                <View style={{
+                                    width: 18, height: 18, borderRadius: 9,
+                                    backgroundColor: step.active ? COLORS.primary : COLORS.surfaceLight,
+                                    borderWidth: 1, borderColor: step.active ? COLORS.primary : COLORS.grey,
+                                    alignItems: 'center', justifyContent: 'center'
+                                }}>
+                                    {step.active && <Ionicons name="checkmark" size={12} color={COLORS.background} />}
+                                </View>
+                                {idx < steps.length - 1 && (
+                                    <View style={{ width: 2, height: 24, backgroundColor: steps[idx + 1].active ? COLORS.primary : COLORS.surfaceLight, marginVertical: 4 }} />
+                                )}
+                            </View>
+                            <Text style={{ color: step.active ? COLORS.white : COLORS.grey, fontSize: 14, fontWeight: step.active ? "600" : "400", marginTop: -2 }}>
+                                {step.label}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+            </View>
+        );
+    };
+
     // ---------- RIGHT-SIDE FOR SUBMISSION/EDIT VIEW LOGIC -----------
-    // Note: subStatusLoading: show spinner, else adapt to state
     const RightSideSubmission = () => {
-        if (subStatusLoading) {
+        // 1. Loading states
+        const actuallySubscribed = isSubscribed || !!submission;
+
+        if (subStatusLoading || (isSubscribed === null && !submission)) {
             return (
-                <View style={{alignItems:"center", justifyContent:"center", flex:1}}>
+                <View style={{ alignItems: "center", justifyContent: "center", flex: 1 }}>
                     <ActivityIndicator size="small" color={COLORS.primary} />
                 </View>
             );
         }
-        // Already submitted, not editing
-        if (submission && !showEditForm) {
+
+        // 2. Not Subscribed -> Show Subscribe Button
+        if (!actuallySubscribed) {
             return (
-                <View style={{flex:1, alignItems:"center", justifyContent:"center", marginTop:40}}>
-                    <Ionicons name="checkmark-done-circle" size={48} color={COLORS.primary}/>
-                    <Text style={{color:COLORS.primary, fontWeight:'bold', fontSize:20, marginTop:10}}>You already submitted!</Text>
-                    <TouchableOpacity style={{marginTop:10, flexDirection:'row', alignItems:'center'}} onPress={()=>setShowEditForm(true)}>
-                        <Ionicons name="create-outline" size={21} color={COLORS.white}/>
-                        <Text style={{color:COLORS.white, marginLeft:5, textDecorationLine:"underline"}}>Edit submission</Text>
+                <View>
+                    <Text style={localStyles.restaurantName}>Join Campaign</Text>
+                    <Text style={[localStyles.description, { marginBottom: 20 }]}>
+                        Subscribe to this post to start your submission.
+                    </Text>
+                    <TouchableOpacity
+                        style={[localStyles.submitBtn, { marginHorizontal: 0, marginTop: 0, backgroundColor: COLORS.primary }]}
+                        onPress={handleSubscribe}
+                        disabled={subscribeLoading}
+                    >
+                        {subscribeLoading ? (
+                            <ActivityIndicator color={COLORS.background} />
+                        ) : (
+                            <Text style={{ color: COLORS.background, fontWeight: '700', fontSize: 16 }}>Subscribe</Text>
+                        )}
                     </TouchableOpacity>
-                    <View style={{marginTop:15, paddingHorizontal:16, paddingVertical:14, borderRadius:8, backgroundColor:COLORS.surfaceLight, width:'100%', maxWidth:370}}>
-                        <Text style={{color: COLORS.grey, fontWeight:"500", marginBottom:3}}>Submitted Link:</Text>
-                        <Text style={{color: COLORS.white, fontSize:15}} selectable>{submission.link}</Text>
-                    </View>
                 </View>
-            )
+            );
         }
-        // Editing OR not yet submitted
-        return <SubmitLinkForm
-            initialLink={submission?.link || ""}
-            onSubmit={(link:string)=>{
-                setSubmission({link});
-                setShowEditForm(false);
-            }}
-            onCancel={submission?.link ? ()=>setShowEditForm(false) : undefined}
-        />
+
+        // 3. Subscribed -> Show Tracker & Submission Form/Status
+        return (
+            <View>
+                <TrackingSteps
+                    status={isSubscribed}
+                    link={submission?.link}
+                    verificationStatus={submission?.verification_status}
+                    paymentStatus={submission?.payment_status}
+                />
+
+                {submission && !showEditForm ? (
+                    <View style={{ marginTop: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                            <Ionicons name="checkmark-done-circle" size={24} color={COLORS.primary} />
+                            <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 18, marginLeft: 8 }}>Submission Received</Text>
+                        </View>
+
+                        <View style={{ padding: 16, borderRadius: 8, backgroundColor: COLORS.surfaceLight, width: '100%' }}>
+                            <Text style={{ color: COLORS.grey, fontWeight: "500", marginBottom: 3 }}>Submitted Link:</Text>
+                            <Text style={{ color: COLORS.white, fontSize: 15 }} selectable>{submission.link}</Text>
+                            {submission.description ? (
+                                <>
+                                    <Text style={{ color: COLORS.grey, fontWeight: "500", marginTop: 12, marginBottom: 3 }}>Notes:</Text>
+                                    <Text style={{ color: COLORS.white, fontSize: 14 }}>{submission.description}</Text>
+                                </>
+                            ) : null}
+                        </View>
+
+                        <TouchableOpacity style={{ marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }} onPress={() => setShowEditForm(true)}>
+                            <Ionicons name="create-outline" size={20} color={COLORS.white} />
+                            <Text style={{ color: COLORS.white, marginLeft: 6, textDecorationLine: "underline" }}>Edit submission</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <SubmitLinkForm
+                        initialLink={submission?.link || ""}
+                        initialNotes={submission?.description || ""}
+                        onSubmit={(link: string, notes: string) => {
+                            // Optimistic update for tracker
+                            setSubmission(prev => ({
+                                ...prev,
+                                link,
+                                description: notes,
+                                // Preserve existing statuses if any, or default to pending
+                                verification_status: prev?.verification_status || 'pending',
+                                payment_status: prev?.payment_status || 'pending'
+                            }));
+                            setShowEditForm(false);
+                        }}
+                        onCancel={submission?.link ? () => setShowEditForm(false) : undefined}
+                    />
+                )}
+            </View>
+        );
     };
 
     return (
@@ -398,7 +584,7 @@ const RestaurantDetailsScreen: React.FC = () => {
             {mobileLayout ? (
                 <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 18, paddingBottom: 60 }}>
                     <DetailsContent />
-                    <View style={{height:32}} />
+                    <View style={{ height: 32 }} />
                     <RightSideSubmission />
                 </ScrollView>
             ) : (
@@ -453,7 +639,7 @@ const localStyles = StyleSheet.create({
     categoryBadge: { backgroundColor: COLORS.surfaceLight, color: COLORS.white, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginVertical: 6, fontSize: 13, overflow: 'hidden' },
     description: { color: COLORS.grey, fontSize: 16, textAlign: 'center', marginTop: 4, lineHeight: 22 },
     section: { marginBottom: 24 },
-    sectionTitle: { fontSize: 17, fontWeight: '700', color: COLORS.instagram.red, marginBottom: 10 },
+    sectionTitle: { fontSize: 17, fontWeight: '700', color: COLORS.instagram.red, marginBottom: 30 },
     row: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
     text: { color: COLORS.white, fontSize: 15, lineHeight: 22 },
     linkText: { color: COLORS.instagram.blue, fontWeight: '600', marginTop: 4, fontSize: 15, marginLeft: 26 },
@@ -470,12 +656,12 @@ const localStyles = StyleSheet.create({
     userCardText: { color: COLORS.white, fontSize: 15, fontWeight: "500" },
     formContainer: { backgroundColor: COLORS.surface, borderRadius: 12, padding: 24, alignItems: 'stretch', marginTop: 36 },
     formTitle: { color: COLORS.primary, fontWeight: '700', fontSize: 18, marginBottom: 16, textAlign: 'center' },
-    formLabel: { color: COLORS.instagram.red, fontWeight: '600', fontSize: 15, marginBottom: 8,marginTop:10 },
+    formLabel: { color: COLORS.instagram.red, fontWeight: '600', fontSize: 15, marginBottom: 8, marginTop: 10 },
     inputWrapper: { backgroundColor: COLORS.surfaceLight, borderRadius: 6, padding: 10, marginBottom: 10, minHeight: 28 },
     linkInput: { color: COLORS.white, fontSize: 14 },
     inputFieldRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
     textInput: { flex: 1, backgroundColor: COLORS.surfaceLight, color: COLORS.white, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, borderWidth: 1, borderColor: COLORS.white },
-    submitBtn: { marginLeft: 8, backgroundColor: COLORS.white, borderRadius: 7, padding: 10, alignItems: 'center', justifyContent: 'center',marginTop:30 },
+    submitBtn: { marginLeft: 8, backgroundColor: COLORS.white, borderRadius: 7, padding: 10, alignItems: 'center', justifyContent: 'center', marginTop: 30 },
     errorText: { color: COLORS.error, fontSize: 13, marginTop: 8, textAlign: 'center' },
     successText: { color: COLORS.primary, fontSize: 13, marginTop: 8, textAlign: 'center' },
 });
