@@ -115,26 +115,10 @@ const ConnectScreen = () => {
             }),
         ]).start();
 
-        router.push('/(creator)/creatorProfileEdit');
+        router.push('/creator/creatorProfileEdit');
     };
 
-    const handleCreatorPress = async () => {
-        // Button press animation
-        Animated.sequence([
-            Animated.timing(buttonScale, {
-                toValue: 0.95,
-                duration: 100,
-                useNativeDriver: true,
-            }),
-            Animated.timing(buttonScale, {
-                toValue: 1,
-                duration: 100,
-                useNativeDriver: true,
-            }),
-        ]).start();
 
-        router.push('/(creator)/creator');
-    };
     const goToBrandMarketPlace = async () => {
         // Button press animation
         Animated.sequence([
@@ -149,8 +133,8 @@ const ConnectScreen = () => {
                 useNativeDriver: true,
             }),
         ]).start();
+        router.push('/creator/posts/posts');
 
-        router.push('/(agency)/posts');
     };
 
     const handleSignOut = async () => {
