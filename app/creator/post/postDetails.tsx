@@ -47,6 +47,13 @@ type APIRestaurantPost = {
     status?: string;
 };
 
+type SubmissionType = {
+    link: string;
+    description?: string;
+    verification_status?: string;
+    payment_status?: string;
+};
+
 const COLORS = {
     primary: "#4ADE80",
     background: "#000000",
@@ -65,7 +72,349 @@ const COLORS = {
 const isMobile = (width: number) => width < 768;
 
 /* -------------------------------------------------------------------------- */
-/* COMPONENT */
+/* EXTRACTED COMPONENTS */
+/* -------------------------------------------------------------------------- */
+
+const renderRewardChip = (pair: KeyValuePair, idx: number) => {
+    const text = `${pair.platform}: ${pair.metric} ${pair.value}${pair.unit} • ₹${pair.reward}`;
+    return (
+        <View key={idx} style={localStyles.rewardChip}>
+            <Text style={localStyles.rewardChipText}>{text}</Text>
+        </View>
+    );
+};
+
+const DetailsContent = ({ post }: { post: APIRestaurantPost }) => (
+    <>
+        <View style={localStyles.heroSection}>
+            <Image
+                source={{ uri: post.restaurantImage || 'https://via.placeholder.com/320x140?text=No+Image' }}
+                style={localStyles.restaurantImage}
+                resizeMode="cover"
+            />
+            <Text style={localStyles.restaurantName}>{post.restaurantName}</Text>
+            {post.category && <Text style={localStyles.categoryBadge}>{post.category}</Text>}
+            <Text style={localStyles.description}>{post.description}</Text>
+        </View>
+
+        {(post.address || post.googleMapsLink) && (
+            <View style={localStyles.section}>
+                <Text style={localStyles.sectionTitle}>Location</Text>
+                <View style={localStyles.row}>
+                    <Ionicons name="location-outline" size={20} color={COLORS.white} style={{ marginRight: 6 }} />
+                    <Text style={localStyles.text}>{post.address}</Text>
+                </View>
+                {post.googleMapsLink && (
+                    <TouchableOpacity onPress={() => Linking.openURL(post.googleMapsLink)}>
+                        <Text style={localStyles.linkText}>Open in Google Maps</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+        )}
+
+        {post.keyValuePairs.length > 0 && (
+            <View style={localStyles.section}>
+                <Text style={localStyles.sectionTitle}>Rewards & Criteria</Text>
+                <View style={localStyles.chipContainer}>
+                    {post.keyValuePairs.map((pair, idx) => renderRewardChip(pair, idx))}
+                </View>
+            </View>
+        )}
+
+        {post.itemsToPromote && (
+            <View style={localStyles.section}>
+                <Text style={localStyles.sectionTitle}>Items to Promote</Text>
+                <Text style={localStyles.text}>{post.itemsToPromote}</Text>
+            </View>
+        )}
+
+        <View style={localStyles.section}>
+            <Text style={localStyles.sectionTitle}>Eligibility</Text>
+            <Text style={localStyles.text}>Min. Followers: {post.minFollowers}{post.minFollowersUnit}</Text>
+        </View>
+
+        <View style={localStyles.section}>
+            <Text style={localStyles.sectionTitle}>Guidelines</Text>
+            <Text style={localStyles.text}>{post.guidelines}</Text>
+        </View>
+    </>
+);
+
+const SubmitLinkForm = ({
+    initialLink = "",
+    initialNotes = "",
+    onSubmit,
+    onCancel,
+    postId
+}: {
+    initialLink?: string,
+    initialNotes?: string,
+    onSubmit: (link: string, notes: string) => void,
+    onCancel?: () => void,
+    postId: string
+}) => {
+    const [link, setLink] = useState(initialLink);
+    const [notes, setNotes] = useState(initialNotes);
+    const [submitting, setSubmitting] = useState(false);
+    const [success, setSuccess] = useState(false);
+    const [errorMsg, setErrorMsg] = useState('');
+
+    const handleSubmit = async () => {
+        if (!link.trim()) {
+            setErrorMsg("Please enter the post link.");
+            setSuccess(false);
+            return;
+        }
+        setSubmitting(true);
+        setErrorMsg('');
+        setSuccess(false);
+
+        try {
+            const auth = await isAuthenticated();
+            if (!auth?.userId) {
+                setErrorMsg("You need to be logged in to submit.");
+                setSubmitting(false);
+                return;
+            }
+
+            // API: POST /influencer/{user_id}/proofs?post_id={post_id}
+            const res = await marketapi.post(`influencer/${auth.userId}/proofs?post_id=${postId}`, {
+                description: notes,
+                link: link
+            });
+
+            if (res.success) {
+                setSuccess(true);
+                setErrorMsg('');
+                // Slight delay to show success message before closing/refreshing
+                setTimeout(() => {
+                    onSubmit(link, notes);
+                    setSubmitting(false);
+                }, 1000);
+            } else {
+                setErrorMsg(res.message || "Failed to submit proof.");
+                setSubmitting(false);
+            }
+        } catch (e: any) {
+            setErrorMsg(e?.message || "An unexpected error occurred.");
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <View>
+            <Text style={localStyles.restaurantName}>{initialLink ? "Edit Your Submitted Link" : "Submit Your Marketed Post Link"}</Text>
+
+            <Text style={localStyles.formLabel}>Post Link</Text>
+            <TextInput
+                style={localStyles.textInput}
+                placeholder="Paste link here"
+                placeholderTextColor={COLORS.grey}
+                value={link}
+                onChangeText={setLink}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                editable={!submitting}
+            />
+
+            <Text style={localStyles.formLabel}>Notes</Text>
+            <TextInput
+                style={[localStyles.textInput, { height: 120, textAlignVertical: 'top' }]}
+                placeholder="Add any notes (optional)"
+                placeholderTextColor={COLORS.grey}
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={3}
+                editable={!submitting}
+            />
+
+            <TouchableOpacity
+                style={[
+                    localStyles.submitBtn,
+                    (submitting || !link.trim()) && { opacity: 0.6 }
+                ]}
+                onPress={handleSubmit}
+                disabled={submitting || !link.trim()}
+                activeOpacity={0.8}
+            >
+                {submitting ? (
+                    <ActivityIndicator color={COLORS.white} />
+                ) : (
+                    <Text style={localStyles.btnTextWhite}>
+                        {initialLink ? "Save" : "Submit"}
+                    </Text>
+                )}
+            </TouchableOpacity>
+            {onCancel ? (
+                <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={onCancel}>
+                    <Text style={{ color: COLORS.grey }}>Cancel</Text>
+                </TouchableOpacity>
+            ) : null}
+            {errorMsg ? (
+                <Text style={localStyles.errorText}>{errorMsg}</Text>
+            ) : null}
+            {success ? (
+                <Text style={localStyles.successText}>Post link submitted!</Text>
+            ) : null}
+        </View>
+    );
+};
+
+const TrackingSteps = ({ status, link, verificationStatus, paymentStatus }: { status: boolean | null, link: string | undefined, verificationStatus: string | undefined, paymentStatus: string | undefined }) => {
+    const steps = [
+        { label: "Subscribed", active: !!status },
+        { label: "Proof Submitted", active: !!link },
+        { label: "Review Completed", active: verificationStatus === "approved" },
+        { label: "Credited Money", active: paymentStatus === "paid" }
+    ];
+
+    return (
+        <View style={{ marginBottom: 24 }}>
+            <Text style={localStyles.sectionTitle}>Status Tracker</Text>
+            <View style={{ marginLeft: 8 }}>
+                {steps.map((step, idx) => (
+                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                        <View style={{ alignItems: 'center', marginRight: 12 }}>
+                            <View style={{
+                                width: 18, height: 18, borderRadius: 9,
+                                backgroundColor: step.active ? COLORS.primary : COLORS.surfaceLight,
+                                borderWidth: 1, borderColor: step.active ? COLORS.primary : COLORS.grey,
+                                alignItems: 'center', justifyContent: 'center'
+                            }}>
+                                {step.active && <Ionicons name="checkmark" size={12} color={COLORS.background} />}
+                            </View>
+                            {idx < steps.length - 1 && (
+                                <View style={{ width: 2, height: 24, backgroundColor: steps[idx + 1].active ? COLORS.primary : COLORS.surfaceLight, marginVertical: 4 }} />
+                            )}
+                        </View>
+                        <Text style={{ color: step.active ? COLORS.white : COLORS.grey, fontSize: 14, fontWeight: step.active ? "600" : "400", marginTop: -2 }}>
+                            {step.label}
+                        </Text>
+                    </View>
+                ))}
+            </View>
+        </View>
+    );
+};
+
+// Extracted PostSubmissionSection
+type PostSubmissionSectionProps = {
+    isSubscribed: boolean | null;
+    submission: SubmissionType | null;
+    subStatusLoading: boolean;
+    subscribeLoading: boolean;
+    showEditForm: boolean;
+    postId: string;
+    handleSubscribe: () => void;
+    setSubmission: React.Dispatch<React.SetStateAction<SubmissionType | null>>;
+    setShowEditForm: React.Dispatch<React.SetStateAction<boolean>>;
+};
+
+const PostSubmissionSection = ({
+    isSubscribed,
+    submission,
+    subStatusLoading,
+    subscribeLoading,
+    showEditForm,
+    postId,
+    handleSubscribe,
+    setSubmission,
+    setShowEditForm
+}: PostSubmissionSectionProps) => {
+    // 1. Loading states
+    const actuallySubscribed = isSubscribed || !!submission;
+
+    if (subStatusLoading || (isSubscribed === null && !submission)) {
+        return (
+            <View style={{ alignItems: "center", justifyContent: "center", flex: 1 }}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+            </View>
+        );
+    }
+
+    // 2. Not Subscribed -> Show Subscribe Button
+    if (!actuallySubscribed) {
+        return (
+            <View>
+                <Text style={localStyles.restaurantName}>Join Campaign</Text>
+                <Text style={[localStyles.description, { marginBottom: 20 }]}>
+                    Subscribe to this post to start your submission.
+                </Text>
+                <TouchableOpacity
+                    style={[localStyles.submitBtn, { marginHorizontal: 0, marginTop: 0, backgroundColor: COLORS.primary }]}
+                    onPress={handleSubscribe}
+                    disabled={subscribeLoading}
+                >
+                    {subscribeLoading ? (
+                        <ActivityIndicator color={COLORS.background} />
+                    ) : (
+                        <Text style={{ color: COLORS.background, fontWeight: '700', fontSize: 16 }}>Subscribe</Text>
+                    )}
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    // 3. Subscribed -> Show Tracker & Submission Form/Status
+    return (
+        <View>
+            <TrackingSteps
+                status={isSubscribed}
+                link={submission?.link}
+                verificationStatus={submission?.verification_status}
+                paymentStatus={submission?.payment_status}
+            />
+
+            {submission && !showEditForm ? (
+                <View style={{ marginTop: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                        <Ionicons name="checkmark-done-circle" size={24} color={COLORS.primary} />
+                        <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 18, marginLeft: 8 }}>Submission Received</Text>
+                    </View>
+
+                    <View style={{ padding: 16, borderRadius: 8, backgroundColor: COLORS.surfaceLight, width: '100%' }}>
+                        <Text style={{ color: COLORS.grey, fontWeight: "500", marginBottom: 3 }}>Submitted Link:</Text>
+                        <Text style={{ color: COLORS.white, fontSize: 15 }} selectable>{submission.link}</Text>
+                        {submission.description ? (
+                            <>
+                                <Text style={{ color: COLORS.grey, fontWeight: "500", marginTop: 12, marginBottom: 3 }}>Notes:</Text>
+                                <Text style={{ color: COLORS.white, fontSize: 14 }}>{submission.description}</Text>
+                            </>
+                        ) : null}
+                    </View>
+
+                    <TouchableOpacity style={{ marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }} onPress={() => setShowEditForm(true)}>
+                        <Ionicons name="create-outline" size={20} color={COLORS.white} />
+                        <Text style={{ color: COLORS.white, marginLeft: 6, textDecorationLine: "underline" }}>Edit submission</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : (
+                <SubmitLinkForm
+                    initialLink={submission?.link || ""}
+                    initialNotes={submission?.description || ""}
+                    postId={postId}
+                    onSubmit={(link: string, notes: string) => {
+                        // Optimistic update for tracker
+                        setSubmission(prev => ({
+                            link,
+                            description: notes,
+                            // Preserve existing statuses if any, or default to pending
+                            verification_status: prev?.verification_status || 'pending',
+                            payment_status: prev?.payment_status || 'pending'
+                        }));
+                        setShowEditForm(false);
+                    }}
+                    onCancel={submission?.link ? () => setShowEditForm(false) : undefined}
+                />
+            )}
+        </View>
+    );
+};
+
+/* -------------------------------------------------------------------------- */
+/* MAIN COMPONENT */
 /* -------------------------------------------------------------------------- */
 
 const RestaurantDetailsScreen: React.FC = () => {
@@ -79,7 +428,7 @@ const RestaurantDetailsScreen: React.FC = () => {
     const [pauseVisible, setPauseVisible] = useState(false);
 
     // NEW: State to manage submission
-    const [submission, setSubmission] = useState<{ link: string; description?: string; verification_status?: string; payment_status?: string } | null>(null);
+    const [submission, setSubmission] = useState<SubmissionType | null>(null);
     const [subStatusLoading, setSubStatusLoading] = useState(true);
     const [showEditForm, setShowEditForm] = useState(false);
 
@@ -228,15 +577,6 @@ const RestaurantDetailsScreen: React.FC = () => {
         setPauseVisible(false);
     };
 
-    const renderRewardChip = (pair: KeyValuePair, idx: number) => {
-        const text = `${pair.platform}: ${pair.metric} ${pair.value}${pair.unit} • ₹${pair.reward}`;
-        return (
-            <View key={idx} style={localStyles.rewardChip}>
-                <Text style={localStyles.rewardChipText}>{text}</Text>
-            </View>
-        );
-    };
-
     if (loading) {
         return (
             <View style={localStyles.centerContainer}>
@@ -279,303 +619,6 @@ const RestaurantDetailsScreen: React.FC = () => {
 
     const dialogProps = getDialogProps();
 
-    const DetailsContent = () => (
-        <>
-            <View style={localStyles.heroSection}>
-                <Image
-                    source={{ uri: post.restaurantImage || 'https://via.placeholder.com/320x140?text=No+Image' }}
-                    style={localStyles.restaurantImage}
-                    resizeMode="cover"
-                />
-                <Text style={localStyles.restaurantName}>{post.restaurantName}</Text>
-                {post.category && <Text style={localStyles.categoryBadge}>{post.category}</Text>}
-                <Text style={localStyles.description}>{post.description}</Text>
-            </View>
-
-            {(post.address || post.googleMapsLink) && (
-                <View style={localStyles.section}>
-                    <Text style={localStyles.sectionTitle}>Location</Text>
-                    <View style={localStyles.row}>
-                        <Ionicons name="location-outline" size={20} color={COLORS.white} style={{ marginRight: 6 }} />
-                        <Text style={localStyles.text}>{post.address}</Text>
-                    </View>
-                    {post.googleMapsLink && (
-                        <TouchableOpacity onPress={() => Linking.openURL(post.googleMapsLink)}>
-                            <Text style={localStyles.linkText}>Open in Google Maps</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-            )}
-
-            {post.keyValuePairs.length > 0 && (
-                <View style={localStyles.section}>
-                    <Text style={localStyles.sectionTitle}>Rewards & Criteria</Text>
-                    <View style={localStyles.chipContainer}>
-                        {post.keyValuePairs.map((pair, idx) => renderRewardChip(pair, idx))}
-                    </View>
-                </View>
-            )}
-
-            {post.itemsToPromote && (
-                <View style={localStyles.section}>
-                    <Text style={localStyles.sectionTitle}>Items to Promote</Text>
-                    <Text style={localStyles.text}>{post.itemsToPromote}</Text>
-                </View>
-            )}
-
-            <View style={localStyles.section}>
-                <Text style={localStyles.sectionTitle}>Eligibility</Text>
-                <Text style={localStyles.text}>Min. Followers: {post.minFollowers}{post.minFollowersUnit}</Text>
-            </View>
-
-            <View style={localStyles.section}>
-                <Text style={localStyles.sectionTitle}>Guidelines</Text>
-                <Text style={localStyles.text}>{post.guidelines}</Text>
-            </View>
-        </>
-    );
-
-    // Right column: Form for submitting/editiing the marketed post link
-    const SubmitLinkForm = ({ initialLink = "", initialNotes = "", onSubmit, onCancel }: { initialLink?: string, initialNotes?: string, onSubmit: (link: string, notes: string) => void, onCancel?: () => void }) => {
-        const [link, setLink] = useState(initialLink);
-        const [notes, setNotes] = useState(initialNotes);
-        const [submitting, setSubmitting] = useState(false);
-        const [success, setSuccess] = useState(false);
-        const [errorMsg, setErrorMsg] = useState('');
-
-        const handleSubmit = async () => {
-            if (!link.trim()) {
-                setErrorMsg("Please enter the post link.");
-                setSuccess(false);
-                return;
-            }
-            setSubmitting(true);
-            setErrorMsg('');
-            setSuccess(false);
-
-            try {
-                const auth = await isAuthenticated();
-                if (!auth?.userId) {
-                    setErrorMsg("You need to be logged in to submit.");
-                    setSubmitting(false);
-                    return;
-                }
-
-                // API: POST /influencer/{user_id}/proofs?post_id={post_id}
-                const res = await marketapi.post(`influencer/${auth.userId}/proofs?post_id=${postId}`, {
-                    description: notes,
-                    link: link
-                });
-
-                if (res.success) {
-                    setSuccess(true);
-                    setErrorMsg('');
-                    // Slight delay to show success message before closing/refreshing
-                    setTimeout(() => {
-                        onSubmit(link, notes);
-                        setSubmitting(false);
-                    }, 1000);
-                } else {
-                    setErrorMsg(res.message || "Failed to submit proof.");
-                    setSubmitting(false);
-                }
-            } catch (e: any) {
-                setErrorMsg(e?.message || "An unexpected error occurred.");
-                setSubmitting(false);
-            }
-        };
-
-        return (
-            <View>
-                <Text style={localStyles.restaurantName}>{initialLink ? "Edit Your Submitted Link" : "Submit Your Marketed Post Link"}</Text>
-
-                <Text style={localStyles.formLabel}>Post Link</Text>
-                <TextInput
-                    style={localStyles.textInput}
-                    placeholder="Paste link here"
-                    placeholderTextColor={COLORS.grey}
-                    value={link}
-                    onChangeText={setLink}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="url"
-                    editable={!submitting}
-                />
-
-                <Text style={localStyles.formLabel}>Notes</Text>
-                <TextInput
-                    style={[localStyles.textInput, { height: 120, textAlignVertical: 'top' }]}
-                    placeholder="Add any notes (optional)"
-                    placeholderTextColor={COLORS.grey}
-                    value={notes}
-                    onChangeText={setNotes}
-                    multiline
-                    numberOfLines={3}
-                    editable={!submitting}
-                />
-
-                <TouchableOpacity
-                    style={[
-                        localStyles.submitBtn,
-                        (submitting || !link.trim()) && { opacity: 0.6 }
-                    ]}
-                    onPress={handleSubmit}
-                    disabled={submitting || !link.trim()}
-                    activeOpacity={0.8}
-                >
-                    {submitting ? (
-                        <ActivityIndicator color={COLORS.white} />
-                    ) : (
-                        <Text style={localStyles.btnTextWhite}>
-                            {initialLink ? "Save" : "Submit"}
-                        </Text>
-                    )}
-                </TouchableOpacity>
-                {onCancel ? (
-                    <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={onCancel}>
-                        <Text style={{ color: COLORS.grey }}>Cancel</Text>
-                    </TouchableOpacity>
-                ) : null}
-                {errorMsg ? (
-                    <Text style={localStyles.errorText}>{errorMsg}</Text>
-                ) : null}
-                {success ? (
-                    <Text style={localStyles.successText}>Post link submitted!</Text>
-                ) : null}
-            </View>
-        );
-    };
-
-    // NEW: Tracker Component
-    const TrackingSteps = ({ status, link, verificationStatus, paymentStatus }: { status: boolean | null, link: string | undefined, verificationStatus: string | undefined, paymentStatus: string | undefined }) => {
-        const steps = [
-            { label: "Subscribed", active: !!status },
-            { label: "Proof Submitted", active: !!link },
-            { label: "Review Completed", active: verificationStatus === "approved" },
-            { label: "Credited Money", active: paymentStatus === "paid" }
-        ];
-
-        return (
-            <View style={{ marginBottom: 24 }}>
-                <Text style={localStyles.sectionTitle}>Status Tracker</Text>
-                <View style={{ marginLeft: 8 }}>
-                    {steps.map((step, idx) => (
-                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                            <View style={{ alignItems: 'center', marginRight: 12 }}>
-                                <View style={{
-                                    width: 18, height: 18, borderRadius: 9,
-                                    backgroundColor: step.active ? COLORS.primary : COLORS.surfaceLight,
-                                    borderWidth: 1, borderColor: step.active ? COLORS.primary : COLORS.grey,
-                                    alignItems: 'center', justifyContent: 'center'
-                                }}>
-                                    {step.active && <Ionicons name="checkmark" size={12} color={COLORS.background} />}
-                                </View>
-                                {idx < steps.length - 1 && (
-                                    <View style={{ width: 2, height: 24, backgroundColor: steps[idx + 1].active ? COLORS.primary : COLORS.surfaceLight, marginVertical: 4 }} />
-                                )}
-                            </View>
-                            <Text style={{ color: step.active ? COLORS.white : COLORS.grey, fontSize: 14, fontWeight: step.active ? "600" : "400", marginTop: -2 }}>
-                                {step.label}
-                            </Text>
-                        </View>
-                    ))}
-                </View>
-            </View>
-        );
-    };
-
-    // ---------- RIGHT-SIDE FOR SUBMISSION/EDIT VIEW LOGIC -----------
-    const RightSideSubmission = () => {
-        // 1. Loading states
-        const actuallySubscribed = isSubscribed || !!submission;
-
-        if (subStatusLoading || (isSubscribed === null && !submission)) {
-            return (
-                <View style={{ alignItems: "center", justifyContent: "center", flex: 1 }}>
-                    <ActivityIndicator size="small" color={COLORS.primary} />
-                </View>
-            );
-        }
-
-        // 2. Not Subscribed -> Show Subscribe Button
-        if (!actuallySubscribed) {
-            return (
-                <View>
-                    <Text style={localStyles.restaurantName}>Join Campaign</Text>
-                    <Text style={[localStyles.description, { marginBottom: 20 }]}>
-                        Subscribe to this post to start your submission.
-                    </Text>
-                    <TouchableOpacity
-                        style={[localStyles.submitBtn, { marginHorizontal: 0, marginTop: 0, backgroundColor: COLORS.primary }]}
-                        onPress={handleSubscribe}
-                        disabled={subscribeLoading}
-                    >
-                        {subscribeLoading ? (
-                            <ActivityIndicator color={COLORS.background} />
-                        ) : (
-                            <Text style={{ color: COLORS.background, fontWeight: '700', fontSize: 16 }}>Subscribe</Text>
-                        )}
-                    </TouchableOpacity>
-                </View>
-            );
-        }
-
-        // 3. Subscribed -> Show Tracker & Submission Form/Status
-        return (
-            <View>
-                <TrackingSteps
-                    status={isSubscribed}
-                    link={submission?.link}
-                    verificationStatus={submission?.verification_status}
-                    paymentStatus={submission?.payment_status}
-                />
-
-                {submission && !showEditForm ? (
-                    <View style={{ marginTop: 10 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                            <Ionicons name="checkmark-done-circle" size={24} color={COLORS.primary} />
-                            <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 18, marginLeft: 8 }}>Submission Received</Text>
-                        </View>
-
-                        <View style={{ padding: 16, borderRadius: 8, backgroundColor: COLORS.surfaceLight, width: '100%' }}>
-                            <Text style={{ color: COLORS.grey, fontWeight: "500", marginBottom: 3 }}>Submitted Link:</Text>
-                            <Text style={{ color: COLORS.white, fontSize: 15 }} selectable>{submission.link}</Text>
-                            {submission.description ? (
-                                <>
-                                    <Text style={{ color: COLORS.grey, fontWeight: "500", marginTop: 12, marginBottom: 3 }}>Notes:</Text>
-                                    <Text style={{ color: COLORS.white, fontSize: 14 }}>{submission.description}</Text>
-                                </>
-                            ) : null}
-                        </View>
-
-                        <TouchableOpacity style={{ marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }} onPress={() => setShowEditForm(true)}>
-                            <Ionicons name="create-outline" size={20} color={COLORS.white} />
-                            <Text style={{ color: COLORS.white, marginLeft: 6, textDecorationLine: "underline" }}>Edit submission</Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    <SubmitLinkForm
-                        initialLink={submission?.link || ""}
-                        initialNotes={submission?.description || ""}
-                        onSubmit={(link: string, notes: string) => {
-                            // Optimistic update for tracker
-                            setSubmission(prev => ({
-                                ...prev,
-                                link,
-                                description: notes,
-                                // Preserve existing statuses if any, or default to pending
-                                verification_status: prev?.verification_status || 'pending',
-                                payment_status: prev?.payment_status || 'pending'
-                            }));
-                            setShowEditForm(false);
-                        }}
-                        onCancel={submission?.link ? () => setShowEditForm(false) : undefined}
-                    />
-                )}
-            </View>
-        );
-    };
-
     return (
         <View style={localStyles.container}>
             <View style={localStyles.header}>
@@ -583,18 +626,38 @@ const RestaurantDetailsScreen: React.FC = () => {
             </View>
             {mobileLayout ? (
                 <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 18, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
-                    <DetailsContent />
+                    <DetailsContent post={post} />
                     <View style={{ height: 32 }} />
-                    <RightSideSubmission />
+                    <PostSubmissionSection
+                        isSubscribed={isSubscribed}
+                        submission={submission}
+                        subStatusLoading={subStatusLoading}
+                        subscribeLoading={subscribeLoading}
+                        showEditForm={showEditForm}
+                        postId={postId}
+                        handleSubscribe={handleSubscribe}
+                        setSubmission={setSubmission}
+                        setShowEditForm={setShowEditForm}
+                    />
                 </ScrollView>
             ) : (
                 <View style={[localStyles.contentContainer, { flexDirection: 'row' }]}>
                     <ScrollView style={localStyles.leftColumn} contentContainerStyle={{ padding: 24, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
-                        <DetailsContent />
+                        <DetailsContent post={post} />
                     </ScrollView>
                     <View style={localStyles.verticalDivider} />
                     <ScrollView style={localStyles.rightColumn} contentContainerStyle={{ padding: 28, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
-                        <RightSideSubmission />
+                        <PostSubmissionSection
+                            isSubscribed={isSubscribed}
+                            submission={submission}
+                            subStatusLoading={subStatusLoading}
+                            subscribeLoading={subscribeLoading}
+                            showEditForm={showEditForm}
+                            postId={postId}
+                            handleSubscribe={handleSubscribe}
+                            setSubmission={setSubmission}
+                            setShowEditForm={setShowEditForm}
+                        />
                     </ScrollView>
                 </View>
             )}
