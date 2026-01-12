@@ -144,30 +144,37 @@ export const refreshToken = async () => {
 export const signOut = async () => {
     console.log('🔍 Starting sign out process...');
     try {
-
+        // 1. Try to sign out from Supabase
         const { error } = await supabase.auth.signOut({ scope: 'local' });
 
-        if (error) {
-            console.error('❌ Sign out error:', error);
-            throw error;
+        // If it's a "Session missing" error, we don't care!
+        // It means the user is already logged out on the server.
+        if (error && error.name !== 'AuthSessionMissingError') {
+            console.warn('Supabase signout warning:', error.message);
         }
 
-        // Clear all stored data
-        console.log('🧹 Clearing stored data...');
-        await removeItem('accessToken');
-        await removeItem('refreshToken');
-        await removeItem('userId');
-        await removeItem('userType');
-        console.log('✅ Storage cleared successfully');
-
-        console.log('✅ Sign out process completed successfully');
-        return true;
     } catch (error) {
-        console.error('❌ Sign out error:', error);
-        throw error;
+        // Log unexpected errors, but don't let them stop the cleanup
+        console.error('Unexpected error during Supabase signout:', error);
     }
-};
 
+    // 2. Clear local storage (Guaranteed execution)
+    console.log('🧹 Clearing stored data...');
+    try {
+        // We use Promise.all to clear everything in parallel
+        await Promise.all([
+            removeItem('accessToken'),
+            removeItem('refreshToken'),
+            removeItem('userId'),
+            removeItem('userType')
+        ]);
+        console.log('✅ Local storage wiped');
+    } catch (e) {
+        console.error('Error wiping storage:', e);
+    }
+
+    return true;
+};
 // User type management functions
 export type UserType = 'brand' | 'influencer';
 
