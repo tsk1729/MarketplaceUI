@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useSegments, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, Text, StyleSheet, Platform } from 'react-native';
 import { isAuthenticated as checkAuth } from './utils/auth';
@@ -7,7 +7,30 @@ import { COLORS } from '@/constants/theme';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 export default function RootLayout() {
-  
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      // Check if we're in the (Login) group to avoid infinite redirects
+      // We also verify that segments is defined and has length to avoid issues during initial mount
+      const inAuthGroup = segments[0] === '(Login)';
+
+      try {
+        const { isAuthenticated } = await checkAuth();
+
+        if (!isAuthenticated && !inAuthGroup) {
+          console.log('🔒 Access denied, redirecting to login');
+          router.replace('/(Login)/login');
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      }
+    };
+
+    checkAuthStatus();
+  }, [segments]);
+
   // Set web body background
   useEffect(() => {
     if (Platform.OS === 'web') {
