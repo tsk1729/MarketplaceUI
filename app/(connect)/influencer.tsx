@@ -140,12 +140,14 @@ const ConnectScreen = () => {
     const handleSignOut = async () => {
         try {
             await signOut();
-            router.replace('/(Login)/login');
         } catch (error) {
-            console.error('Error signing out:', error);
+            console.error('Final fallback error catch:', error);
+        } finally {
+            // ALWAYS redirect to login, even if an error occurred
+            // This ensures the user isn't stuck on a private screen
+            router.replace('/(Login)/login');
         }
     };
-
     if (isLoading) {
         return (
             <View style={styles.fullScreenContainer}>
