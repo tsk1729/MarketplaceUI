@@ -144,7 +144,8 @@ export const refreshToken = async () => {
 export const signOut = async () => {
     console.log('🔍 Starting sign out process...');
     try {
-        const { error } = await supabase.auth.signOut();
+
+        const { error } = await supabase.auth.signOut({ scope: 'local' });
 
         if (error) {
             console.error('❌ Sign out error:', error);
@@ -201,13 +202,4 @@ export const getUserType = async (): Promise<UserType> => {
     }
 };
 
-// Check if user type is set
-export const hasUserType = async (): Promise<boolean> => {
-    try {
-        const userType = await getUserType();
-        return userType !== null && userType !== undefined;
-    } catch (error) {
-        console.error('❌ Error checking user type:', error);
-        return false;
-    }
-};
+
