@@ -582,18 +582,18 @@ const RestaurantDetailsScreen: React.FC = () => {
                 <Text style={localStyles.headerTitle}>Restaurant Details</Text>
             </View>
             {mobileLayout ? (
-                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 18, paddingBottom: 60 }}>
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 18, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
                     <DetailsContent />
                     <View style={{ height: 32 }} />
                     <RightSideSubmission />
                 </ScrollView>
             ) : (
                 <View style={[localStyles.contentContainer, { flexDirection: 'row' }]}>
-                    <ScrollView style={localStyles.leftColumn} contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
+                    <ScrollView style={localStyles.leftColumn} contentContainerStyle={{ padding: 24, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
                         <DetailsContent />
                     </ScrollView>
                     <View style={localStyles.verticalDivider} />
-                    <ScrollView style={localStyles.rightColumn} contentContainerStyle={{ padding: 28, paddingBottom: 60 }}>
+                    <ScrollView style={localStyles.rightColumn} contentContainerStyle={{ padding: 28, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
                         <RightSideSubmission />
                     </ScrollView>
                 </View>
@@ -660,7 +660,7 @@ const localStyles = StyleSheet.create({
     inputWrapper: { backgroundColor: COLORS.surfaceLight, borderRadius: 6, padding: 10, marginBottom: 10, minHeight: 28 },
     linkInput: { color: COLORS.white, fontSize: 14 },
     inputFieldRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
-    textInput: { flex: 1, backgroundColor: COLORS.surfaceLight, color: COLORS.white, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, borderWidth: 1, borderColor: COLORS.white },
+    textInput: { backgroundColor: COLORS.surfaceLight, color: COLORS.white, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, borderWidth: 1, borderColor: COLORS.white },
     submitBtn: { marginLeft: 8, backgroundColor: COLORS.white, borderRadius: 7, padding: 10, alignItems: 'center', justifyContent: 'center', marginTop: 30 },
     errorText: { color: COLORS.error, fontSize: 13, marginTop: 8, textAlign: 'center' },
     successText: { color: COLORS.primary, fontSize: 13, marginTop: 8, textAlign: 'center' },
