@@ -82,16 +82,18 @@ const Header = memo(
                     { flexDirection: isDesktop ? "row" : "column" }
                 ]}
             >
-                <TextInput
-                    placeholder="Search by tags, locations..."
-                    placeholderTextColor={COLORS.grey}
-                    value={search}
-                    onChangeText={setSearch}
-                    style={[
-                        styles.searchBox,
-                        { flex: isDesktop ? 1 : 0, marginRight: isDesktop ? 12 : 0 }
-                    ]}
-                />
+                <View style={isDesktop ? { flex: 1, marginRight: 12 } : { width: "100%" }}>
+                    <TextInput
+                        placeholder="Search by tags, locations..."
+                        placeholderTextColor={COLORS.grey}
+                        value={search}
+                        onChangeText={setSearch}
+                        style={[
+                            styles.searchBox,
+                            { width: "100%" }
+                        ]}
+                    />
+                </View>
 
                 <View style={[
                     styles.sortContainer,

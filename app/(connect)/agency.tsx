@@ -156,13 +156,18 @@ const ConnectScreen = () => {
 
     const handleSignOut = async () => {
         try {
+            console.log("➡️ Calling signOut()");
             await signOut();
-            router.replace('/(Login)/login');
-        } catch (error) {
-            console.error('Error signing out:', error);
+            console.log("✅ signOut resolved");
+        } catch (err) {
+            console.log("🔥 HANDLE CATCH HIT");
+            console.error(err);
+        } finally {
+            console.log("➡️ Redirecting");
             router.replace('/(Login)/login');
         }
     };
+
 
     if (isLoading) {
         return (
