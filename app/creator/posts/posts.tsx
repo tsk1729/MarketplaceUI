@@ -275,7 +275,7 @@ export default function RestaurantOffersGridScreen() {
             // Construct query params
             const params = new URLSearchParams({
                 user_id: auth.userId || "",
-                page_size: "3",
+                page_size: "10",
                 direction: sortConfig.direction,
                 sort_field: sortConfig.field
             });

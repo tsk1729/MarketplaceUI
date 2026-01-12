@@ -13,9 +13,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { isAuthenticated } from "@/app/utils/auth";
-import { marketapi,localapi } from "../../utils/api";
+import { marketapi, localapi } from "../../utils/api";
 // Adjust this import path based on your file structure
-import { CreatePostModal } from "../(agency)/formModal";
+import { CreatePostModal } from "./formModal";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 /* -------------------------------------------------------------------------- */
@@ -93,6 +93,10 @@ const RestaurantDetailsScreen: React.FC = () => {
     const [pauseVisible, setPauseVisible] = useState(false);
     const [isPausing, setIsPausing] = useState(false);
 
+    // Lists
+    const [enrolledUsers, setEnrolledUsers] = useState<string[]>([]);
+    const [completedUsers, setCompletedUsers] = useState<string[]>([]);
+
     // Get ID from params (support both naming conventions just in case)
     const postId = typeof params.postId === "string" ? params.postId : "";
 
@@ -140,6 +144,19 @@ const RestaurantDetailsScreen: React.FC = () => {
                 };
                 setPost(mappedPost);
             }
+
+            // Fetch enrolled users
+            const enrolledRes = await marketapi.get(`${postId}/subscribers`);
+            if (enrolledRes.success && enrolledRes.data?.data) {
+                setEnrolledUsers(enrolledRes.data.data);
+            }
+
+            // Fetch completed users (Using the same API as per instructions)
+            const completedRes = await marketapi.get(`${postId}/settled-submissions`);
+            if (completedRes.success && completedRes.data?.data) {
+                setCompletedUsers(completedRes.data.data);
+            }
+
         } catch (e: any) {
             console.error(e);
             setError(e?.message || "Failed to fetch details");
@@ -356,7 +373,7 @@ const RestaurantDetailsScreen: React.FC = () => {
 
                     {/* Stats Placeholders */}
                     <Text style={localStyles.statsTitle}>Influencers Enrolled</Text>
-                    {["John Doe", "Jane Smith", "Alex Kim"].map((name, idx) => (
+                    {enrolledUsers.map((name, idx) => (
                         <View key={idx} style={localStyles.userCard}>
                             <Text style={localStyles.userCardText}>{name}</Text>
                         </View>
@@ -365,7 +382,7 @@ const RestaurantDetailsScreen: React.FC = () => {
                     <View style={{ height: 24 }} />
 
                     <Text style={localStyles.statsTitle}>Influencers Completed</Text>
-                    {["Sara Novak", "Mohammed Khan"].map((name, idx) => (
+                    {completedUsers.map((name, idx) => (
                         <View key={idx} style={localStyles.userCard}>
                             <Text style={localStyles.userCardText}>{name}</Text>
                         </View>
@@ -472,7 +489,7 @@ const RestaurantDetailsScreen: React.FC = () => {
 
                         {/* Stats Placeholders */}
                         <Text style={localStyles.statsTitle}>Influencers Enrolled</Text>
-                        {["John Doe", "Jane Smith", "Alex Kim"].map((name, idx) => (
+                        {enrolledUsers.map((name, idx) => (
                             <View key={idx} style={localStyles.userCard}>
                                 <Text style={localStyles.userCardText}>{name}</Text>
                             </View>
@@ -481,7 +498,7 @@ const RestaurantDetailsScreen: React.FC = () => {
                         <View style={{ height: 24 }} />
 
                         <Text style={localStyles.statsTitle}>Influencers Completed</Text>
-                        {["Sara Novak", "Mohammed Khan"].map((name, idx) => (
+                        {completedUsers.map((name, idx) => (
                             <View key={idx} style={localStyles.userCard}>
                                 <Text style={localStyles.userCardText}>{name}</Text>
                             </View>
@@ -526,7 +543,7 @@ const RestaurantDetailsScreen: React.FC = () => {
                     dialogCancelLabel = "Close";
                     dialogProceedLabel = undefined;
                     dialogButtonColor = COLORS.instagram.red;
-                    dialogProceed = async () => {};
+                    dialogProceed = async () => { };
                 }
 
                 return (
