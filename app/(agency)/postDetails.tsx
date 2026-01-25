@@ -11,12 +11,13 @@ import {
     ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { isAuthenticated } from "@/app/utils/auth";
 import { marketapi, localapi } from "../../utils/api";
 // Adjust this import path based on your file structure
 import { CreatePostModal } from "./formModal";
 import ConfirmDialog from "../components/ConfirmDialog";
+import ErrorBanner from "../components/ErrorBanner";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES */
@@ -78,6 +79,7 @@ const isMobile = (width: number) => width < 768;
 const RestaurantDetailsScreen: React.FC = () => {
     const { width } = useWindowDimensions();
     const params = useLocalSearchParams();
+    const router = useRouter();
 
     // State for Main Data
     const [post, setPost] = useState<APIRestaurantPost | null>(null);
@@ -92,6 +94,11 @@ const RestaurantDetailsScreen: React.FC = () => {
     // State for Pause dialog
     const [pauseVisible, setPauseVisible] = useState(false);
     const [isPausing, setIsPausing] = useState(false);
+
+    // State for Delete dialog
+    const [deleteVisible, setDeleteVisible] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // Lists
     const [enrolledUsers, setEnrolledUsers] = useState<string[]>([]);
@@ -242,6 +249,35 @@ const RestaurantDetailsScreen: React.FC = () => {
         }
     };
 
+    const handleDeletePost = async () => {
+        if (!postId) return;
+        setIsDeleting(true);
+        setDeleteError(null);
+        try {
+            const auth = await isAuthenticated();
+            if (!auth?.userId) throw new Error("Unauthorized");
+
+            // DELETE http://127.0.0.1:8000/posts/{postId}/{userId}
+            // Using localapi helper
+            const endpoint = `posts/${encodeURIComponent(auth.userId)}/${encodeURIComponent(postId)}`;
+
+            // localapi.del automatically adds base URL and handles JSON body
+            const res = await marketapi.del(endpoint, {});
+
+            if (!res.success) throw new Error(res.message || "Failed to delete campaign");
+
+            setDeleteVisible(false);
+
+            router.back();
+        } catch (e: any) {
+            console.error("Failed to delete campaign", e);
+            setDeleteVisible(false); // Close dialog to show banner on screen
+            setDeleteError("Something went wrong.");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     /* --------------------------- Render Helpers --------------------------- */
 
     const renderRewardChip = (pair: KeyValuePair, idx: number) => {
@@ -275,6 +311,9 @@ const RestaurantDetailsScreen: React.FC = () => {
     }
 
     const mobileLayout = isMobile(width);
+
+    // NEW: Logic to enable/disable delete button
+    const canDelete = enrolledUsers.length === 0 && completedUsers.length === 0;
 
     return (
         <View style={localStyles.container}>
@@ -364,11 +403,34 @@ const RestaurantDetailsScreen: React.FC = () => {
                             )}
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={localStyles.deleteButton} onPress={() => setPauseVisible(true)}>
-                            <Text style={localStyles.btnTextWhite}>
-                                {post.status === "active" ? "Pause Campaign" : "Resume Campaign"}
-                            </Text>
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <TouchableOpacity
+                                style={[localStyles.deleteButton, { flex: 1, backgroundColor: COLORS.surfaceLight }]}
+                                onPress={() => setPauseVisible(true)}
+                            >
+                                <Text style={localStyles.btnTextWhite}>
+                                    {post.status === "active" ? "Pause Campaign" : "Resume Campaign"}
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    localStyles.deleteButton,
+                                    {
+                                        flex: 1,
+                                        backgroundColor: canDelete ? COLORS.error : COLORS.surfaceLight,
+                                        borderColor: canDelete ? COLORS.error : '#444',
+                                        opacity: canDelete ? 1 : 0.5
+                                    }
+                                ]}
+                                onPress={() => canDelete && setDeleteVisible(true)}
+                                disabled={!canDelete}
+                            >
+                                <Text style={[localStyles.btnTextWhite, !canDelete && { color: COLORS.grey }]}>
+                                    Delete Campaign
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Stats Placeholders */}
@@ -465,7 +527,7 @@ const RestaurantDetailsScreen: React.FC = () => {
                         contentContainerStyle={{ padding: 28, paddingBottom: 60 }}
                     >
                         {/* Action Buttons */}
-                        <View style={localStyles.actionRow}>
+                        <View style={[localStyles.actionRow, { flexDirection: 'column', gap: 12 }]}>
                             <TouchableOpacity
                                 style={localStyles.editButton}
                                 onPress={handleEditPress}
@@ -478,11 +540,34 @@ const RestaurantDetailsScreen: React.FC = () => {
                                 )}
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={localStyles.deleteButton} onPress={() => setPauseVisible(true)}>
-                                <Text style={localStyles.btnTextWhite}>
-                                    {post.status === "active" ? "Pause Campaign" : "Resume Campaign"}
-                                </Text>
-                            </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                                <TouchableOpacity
+                                    style={[localStyles.deleteButton, { flex: 1 }]}
+                                    onPress={() => setPauseVisible(true)}
+                                >
+                                    <Text style={localStyles.btnTextWhite}>
+                                        {post.status === "active" ? "Pause Campaign" : "Resume Campaign"}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[
+                                        localStyles.deleteButton,
+                                        {
+                                            flex: 1,
+                                            backgroundColor: canDelete ? COLORS.instagram.red : COLORS.surfaceLight,
+                                            borderColor: canDelete ? COLORS.error : '#444',
+                                            opacity: canDelete ? 1 : 0.5
+                                        }
+                                    ]}
+                                    onPress={() => canDelete && setDeleteVisible(true)}
+                                    disabled={!canDelete}
+                                >
+                                    <Text style={[localStyles.btnTextWhite, !canDelete && { color: COLORS.grey }]}>
+                                        Delete Campaign
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         <View style={localStyles.dividerLine} />
@@ -507,7 +592,6 @@ const RestaurantDetailsScreen: React.FC = () => {
                 </View>
             )}
 
-            {/* --- MODAL --- */}
             {editModalVisible && (
                 <CreatePostModal
                     isVisible={editModalVisible}
@@ -519,6 +603,16 @@ const RestaurantDetailsScreen: React.FC = () => {
                     // IMPORTANT: Pass the correctly shaped data here
                     initialData={editFormData}
                 />
+            )}
+
+            {/* Error Banner Overlay (absolute or top of screen) */}
+            {deleteError && (
+                <View style={{ position: 'absolute', top: 40, left: 0, right: 0, zIndex: 999 }}>
+                    <ErrorBanner
+                        error={deleteError}
+                        onDismiss={() => setDeleteError(null)}
+                    />
+                </View>
             )}
 
             {/* --- Set ConfirmDialog props dynamically based on status --- */}
@@ -560,6 +654,25 @@ const RestaurantDetailsScreen: React.FC = () => {
                     />
                 );
             })()}
+
+            {/* --- Delete Confirmation Dialog --- */}
+            <ConfirmDialog
+                visible={deleteVisible}
+                header="Delete Campaign"
+                description="Are you sure you want to delete this campaign? This action cannot be undone."
+                cancelLabel="Cancel"
+                proceedLabel="Delete"
+                proceedButtonColor={COLORS.error}
+                loading={isDeleting}
+                onCancel={() => {
+                    if (isDeleting) return;
+                    setDeleteVisible(false);
+                    // We don't clear error here on cancel so user can still see it if they cancelling after error?
+                    // Actually, if they cancel, they probably want to dismiss everything.
+                    // But error is now global.
+                }}
+                onProceed={handleDeletePost}
+            />
         </View>
     );
 };

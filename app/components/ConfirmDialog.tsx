@@ -16,6 +16,7 @@ export type ConfirmDialogProps = {
 
   header?: string;
   description?: string;
+  error?: string;
 
   cancelLabel?: string;
   proceedLabel?: string;
@@ -54,6 +55,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   visible,
   header = "Are you sure?",
   description = "This action cannot be undone.",
+  error,
   cancelLabel = "Cancel",
   proceedLabel = "Proceed",
   onCancel,
@@ -83,7 +85,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         {/* Inner container - capture presses so backdrop doesn't receive them */}
         <Pressable
           style={styles.dialog}
-          onPress={() => {}}
+          onPress={() => { }}
           testID={testID ? `${testID}-container` : undefined}
         >
           <Text style={styles.header} numberOfLines={2}>
@@ -92,6 +94,10 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
           {!!description && (
             <Text style={styles.description}>{description}</Text>
+          )}
+
+          {!!error && (
+            <Text style={styles.errorText}>{error}</Text>
           )}
 
           <View style={styles.buttonsRow}>
@@ -178,6 +184,12 @@ const styles = StyleSheet.create({
     color: COLORS.grey,
     fontSize: 14,
     lineHeight: 20,
+  },
+  errorText: {
+    marginTop: 8,
+    color: COLORS.error,
+    fontSize: 14,
+    fontWeight: "500",
   },
   buttonsRow: {
     marginTop: 16,

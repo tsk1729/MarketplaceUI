@@ -1,8 +1,9 @@
 'use client';
-import React, { memo, useState, useEffect, ChangeEvent } from "react";
+import React, { memo, useState, useEffect, useRef, ChangeEvent } from "react";
 import { COLORS } from "@/constants/theme";
 import { isAuthenticated } from "../utils/auth";
-import {localapi, marketapi} from "../../utils/api";
+import { localapi, marketapi } from "../../utils/api";
+import ErrorBanner from "../components/ErrorBanner";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES */
@@ -55,16 +56,17 @@ const INITIAL_FORM: FormState = {
 /* -------------------------------------------------------------------------- */
 
 export const CreatePostModal = memo(function CreatePostModal({
-                                                                 isVisible,
-                                                                 onClose,
-                                                                 onSubmit,
-                                                                 initialData,
-                                                             }: CreatePostModalProps) {
+    isVisible,
+    onClose,
+    onSubmit,
+    initialData,
+}: CreatePostModalProps) {
     const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [fadeClass, setFadeClass] = useState(isVisible ? "fade-in" : "hidden");
     const [error, setError] = useState<string | null>(null);
+    const modalRef = useRef<HTMLDivElement>(null);
 
     const isEditMode = !!initialData; // Derived state to check if we are editing
 
@@ -105,6 +107,13 @@ export const CreatePostModal = memo(function CreatePostModal({
         }
         return () => timer && clearTimeout(timer);
     }, [isVisible, fadeClass, initialData]);
+
+    // Internal: Scroll to top if error appears
+    useEffect(() => {
+        if (error && modalRef.current) {
+            modalRef.current.scrollTo({ top: 0, behavior: "smooth" });
+        }
+    }, [error]);
 
     // ... (Keep existing animation style useEffect) ...
     useEffect(() => {
@@ -251,6 +260,7 @@ export const CreatePostModal = memo(function CreatePostModal({
             onClick={onClose}
         >
             <div
+                ref={modalRef}
                 style={{
                     ...styles.modal,
                     pointerEvents: isSubmitting ? "none" : "auto",
@@ -264,7 +274,11 @@ export const CreatePostModal = memo(function CreatePostModal({
                 </h2>
 
                 {/* ... (Keep Error and Required Fields Note) ... */}
-                {error && <div style={styles.errorBanner}>{error}</div>}
+                {error && (
+                    <div style={{ marginBottom: 12 }}>
+                        <ErrorBanner error={error} onDismiss={() => setError(null)} />
+                    </div>
+                )}
 
                 {/* ... (Keep Name, Description, Items, Followers inputs same as before) ... */}
                 <div style={styles.field}>
@@ -343,7 +357,7 @@ export const CreatePostModal = memo(function CreatePostModal({
                 {/* Restaurant Image Picker */}
                 <div style={styles.field}>
                     <label style={styles.label}>
-                        Restaurant Image { !isEditMode && <span style={{ color: "#fa4848" }}>*</span> }
+                        Restaurant Image {!isEditMode && <span style={{ color: "#fa4848" }}>*</span>}
                     </label>
                     <input
                         type="file"
@@ -353,7 +367,7 @@ export const CreatePostModal = memo(function CreatePostModal({
                         disabled={isSubmitting}
                     />
                     {imagePreview && (
-                        <div style={{textAlign: 'center'}}>
+                        <div style={{ textAlign: 'center' }}>
                             <img
                                 src={imagePreview}
                                 alt="Preview"
@@ -366,7 +380,7 @@ export const CreatePostModal = memo(function CreatePostModal({
                                 }}
                             />
                             {isEditMode && !formData.restaurantImage && (
-                                <div style={{fontSize:12, color: "#888", marginTop: 4}}>Current Image</div>
+                                <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Current Image</div>
                             )}
                         </div>
                     )}
@@ -402,16 +416,7 @@ export const CreatePostModal = memo(function CreatePostModal({
 // Just added one helper style for the error
 const styles: { [key: string]: React.CSSProperties } = {
     // ... (Your existing styles) ...
-    errorBanner: {
-        color: "#ff5974",
-        background: "rgba(255,90,120,0.07)",
-        fontWeight: 500,
-        padding: "9px 12px",
-        marginBottom: 12,
-        borderRadius: 7,
-        fontSize: "15px",
-        textAlign: "center",
-    },
+
     // ... (rest of your styles)
     overlay: {
         position: "fixed",
