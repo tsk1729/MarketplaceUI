@@ -96,6 +96,21 @@ export const styles = StyleSheet.create({
         flex: 1,
         minWidth: 0, // Allow input to shrink if needed
     },
+    socialRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        marginBottom: 16,
+        width: '100%',
+    },
+    socialInputContainer: {
+        flex: 2, // Takes up 2/3 of the row
+        marginBottom: 0, // Override default margin since row handles it
+    },
+    socialFollowerContainer: {
+        flex: 1, // Takes up 1/3 of the row
+        marginBottom: 0,
+    },
     connectButton: {
         backgroundColor: COLORS.white,
         paddingHorizontal: Platform.OS === 'web' ? 16 : 12,

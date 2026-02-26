@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { isAuthenticated } from "@/app/utils/auth";
-import { marketapi, localapi } from "../../utils/api";
+import { localapi } from "../../utils/api";
 // Adjust this import path based on your file structure
 import { CreatePostModal } from "./formModal";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -101,7 +101,7 @@ const RestaurantDetailsScreen: React.FC = () => {
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // Lists
-    const [enrolledUsers, setEnrolledUsers] = useState<string[]>([]);
+    const [enrolledUsers, setEnrolledUsers] = useState<any[]>([]);
     const [completedUsers, setCompletedUsers] = useState<string[]>([]);
 
     // Get ID from params (support both naming conventions just in case)
@@ -124,7 +124,7 @@ const RestaurantDetailsScreen: React.FC = () => {
             const auth = await isAuthenticated();
             if (!auth?.userId) throw new Error("Unauthorized");
 
-            const res = await marketapi.get(`post?user_id=${auth.userId}&post_id=${postId}`);
+            const res = await localapi.get(`post?user_id=${auth.userId}&post_id=${postId}`);
 
             if (!res.success || !res.data?.data || Object.keys(res.data.data).length === 0) {
                 setError("Post not found");
@@ -153,13 +153,13 @@ const RestaurantDetailsScreen: React.FC = () => {
             }
 
             // Fetch enrolled users
-            const enrolledRes = await marketapi.get(`${postId}/subscribers`);
+            const enrolledRes = await localapi.get(`${postId}/subscribers`);
             if (enrolledRes.success && enrolledRes.data?.data) {
                 setEnrolledUsers(enrolledRes.data.data);
             }
 
             // Fetch completed users (Using the same API as per instructions)
-            const completedRes = await marketapi.get(`${postId}/settled-submissions`);
+            const completedRes = await localapi.get(`${postId}/settled-submissions`);
             if (completedRes.success && completedRes.data?.data) {
                 setCompletedUsers(completedRes.data.data);
             }
@@ -237,7 +237,7 @@ const RestaurantDetailsScreen: React.FC = () => {
             if (!auth?.userId) throw new Error("Unauthorized");
             // Send post_id & status via query string as API expects
             const endpoint = `update_status?post_id=${encodeURIComponent(postId)}&status=${encodeURIComponent(status)}`;
-            const res = await marketapi.post(endpoint, {});
+            const res = await localapi.post(endpoint, {});
             if (!res.success) throw new Error(res.message || "Failed to update campaign status");
             setPauseVisible(false);
             fetchPost();
@@ -262,7 +262,7 @@ const RestaurantDetailsScreen: React.FC = () => {
             const endpoint = `posts/${encodeURIComponent(auth.userId)}/${encodeURIComponent(postId)}`;
 
             // localapi.del automatically adds base URL and handles JSON body
-            const res = await marketapi.del(endpoint, {});
+            const res = await localapi.del(endpoint, {});
 
             if (!res.success) throw new Error(res.message || "Failed to delete campaign");
 
@@ -275,6 +275,30 @@ const RestaurantDetailsScreen: React.FC = () => {
             setDeleteError("Something went wrong.");
         } finally {
             setIsDeleting(false);
+        }
+    };
+
+    const handleAccept = async (influencerId: string) => {
+        try {
+            const endpoint = `${postId}/submissions/${influencerId}/accept`;
+            const res = await localapi.patch(endpoint, {});
+            if (!res.success) throw new Error(res.message || "Failed to accept");
+            fetchPost(); // refresh list
+        } catch (e: any) {
+            console.error("Accept failed", e);
+            alert(e?.message || "Accept failed");
+        }
+    };
+
+    const handleReject = async (influencerId: string) => {
+        try {
+            const endpoint = `${postId}/submissions/${influencerId}/reject`;
+            const res = await localapi.patch(endpoint, {});
+            if (!res.success) throw new Error(res.message || "Failed to reject");
+            fetchPost(); // refresh list
+        } catch (e: any) {
+            console.error("Reject failed", e);
+            alert(e?.message || "Reject failed");
         }
     };
 
@@ -435,9 +459,28 @@ const RestaurantDetailsScreen: React.FC = () => {
 
                     {/* Stats Placeholders */}
                     <Text style={localStyles.statsTitle}>Influencers Enrolled</Text>
-                    {enrolledUsers.map((name, idx) => (
+                    {enrolledUsers.map((user, idx) => (
                         <View key={idx} style={localStyles.userCard}>
-                            <Text style={localStyles.userCardText}>{name}</Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                <Text style={localStyles.userCardText}>{user.name}</Text>
+                                <View style={[localStyles.statusBadge, {
+                                    backgroundColor: user.submission_status === 'accepted' ? COLORS.primary
+                                        : user.submission_status === 'rejected' ? COLORS.error
+                                            : COLORS.secondary
+                                }]}>
+                                    <Text style={localStyles.statusText}>{user.submission_status?.toUpperCase() || 'PENDING'}</Text>
+                                </View>
+                            </View>
+                            {user.submission_status === 'pending' && (
+                                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                                    <TouchableOpacity style={[localStyles.editButton, { flex: 1, paddingVertical: 6, backgroundColor: COLORS.primary }]} onPress={() => handleAccept(user.influencer_id)}>
+                                        <Text style={localStyles.btnTextWhite}>Accept</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[localStyles.deleteButton, { flex: 1, paddingVertical: 6, borderColor: COLORS.error }]} onPress={() => handleReject(user.influencer_id)}>
+                                        <Text style={[localStyles.btnTextWhite, { color: COLORS.error }]}>Reject</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
                         </View>
                     ))}
 
@@ -574,9 +617,28 @@ const RestaurantDetailsScreen: React.FC = () => {
 
                         {/* Stats Placeholders */}
                         <Text style={localStyles.statsTitle}>Influencers Enrolled</Text>
-                        {enrolledUsers.map((name, idx) => (
+                        {enrolledUsers.map((user, idx) => (
                             <View key={idx} style={localStyles.userCard}>
-                                <Text style={localStyles.userCardText}>{name}</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                    <Text style={localStyles.userCardText}>{user.name}</Text>
+                                    <View style={[localStyles.statusBadge, {
+                                        backgroundColor: user.submission_status === 'accepted' ? COLORS.primary
+                                            : user.submission_status === 'rejected' ? COLORS.error
+                                                : COLORS.secondary
+                                    }]}>
+                                        <Text style={localStyles.statusText}>{user.submission_status?.toUpperCase() || 'PENDING'}</Text>
+                                    </View>
+                                </View>
+                                {user.submission_status === 'pending' && (
+                                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                                        <TouchableOpacity style={[localStyles.editButton, { flex: 1, paddingVertical: 6, backgroundColor: COLORS.primary }]} onPress={() => handleAccept(user.influencer_id)}>
+                                            <Text style={localStyles.btnTextWhite}>Accept</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={[localStyles.deleteButton, { flex: 1, paddingVertical: 6, borderColor: COLORS.error }]} onPress={() => handleReject(user.influencer_id)}>
+                                            <Text style={[localStyles.btnTextWhite, { color: COLORS.error }]}>Reject</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
                             </View>
                         ))}
 
@@ -853,5 +915,15 @@ const localStyles = StyleSheet.create({
         color: COLORS.white,
         fontSize: 15,
         fontWeight: "500",
+    },
+    statusBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+    },
+    statusText: {
+        color: COLORS.white,
+        fontSize: 10,
+        fontWeight: "bold",
     },
 });

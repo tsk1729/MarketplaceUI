@@ -7,12 +7,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { isAuthenticated, getUserName, signOut } from '../utils/auth';
 import { styles } from './styles';
+import { localapi } from '../../utils/api';
+import ErrorBanner from '../components/ErrorBanner';
 
-const ConnectScreen = () => {
+const BrandConnectScreen = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);
     const [userName, setUserName] = useState('User');
     const [queueCount, setQueueCount] = useState(0);
+    const [profileComplete, setProfileComplete] = useState(false);
+    const [profileError, setProfileError] = useState<string | null>(null);
     const router = useRouter();
 
     // Animation refs
@@ -38,6 +42,21 @@ const ConnectScreen = () => {
                 // Get user name
                 const name = await getUserName();
                 setUserName(name);
+
+                // Check profile completeness
+                const checkRes = await localapi.get(`brands/brand-profile-check?user_id=${currentUserId}`);
+                if (checkRes.success) {
+                    const { is_complete, missing_fields } = checkRes.data;
+                    setProfileComplete(is_complete);
+                    if (!is_complete) {
+                        const readable = missing_fields.join(', ');
+                        setProfileError(`Please complete your profile. Missing: ${readable}`);
+                    }
+                } else {
+                    // 404 - profile doesn't exist at all
+                    setProfileComplete(false);
+                    setProfileError('Brand profile not found. Please fill in your brand details using Edit Profile.');
+                }
             } catch (error) {
                 console.error('Error initializing user:', error);
             } finally {
@@ -100,7 +119,7 @@ const ConnectScreen = () => {
         pulseLoop.start();
     };
 
-    const handleAgencyEditProfile = async () => {
+    const handleBrandEditProfile = async () => {
         // Button press animation
         Animated.sequence([
             Animated.timing(buttonScale, {
@@ -115,10 +134,10 @@ const ConnectScreen = () => {
             }),
         ]).start();
 
-        router.push('/(agency)/agencyProfileEdit');
+        router.push('/(brand)/brandProfileEdit');
     };
 
-    const handleAgencyCreatePost = async () => {
+    const handleBrandCreatePost = async () => {
         // Button press animation
         Animated.sequence([
             Animated.timing(buttonScale, {
@@ -133,7 +152,7 @@ const ConnectScreen = () => {
             }),
         ]).start();
 
-        router.push('/(agency)/createPost');
+        router.push('/(brand)/createPost');
     };
 
     const handleModifyPosts = async () => {
@@ -151,7 +170,7 @@ const ConnectScreen = () => {
             }),
         ]).start();
 
-        router.push('/(agency)/posts');
+        router.push('/(brand)/posts');
     };
 
     const handleSignOut = async () => {
@@ -250,6 +269,15 @@ const ConnectScreen = () => {
                                 Welcome to Marketplace
                             </Animated.Text>
 
+                            {/* Profile Incomplete Banner */}
+                            {profileError && (
+                                <ErrorBanner
+                                    error={profileError}
+                                    type="info"
+                                    onDismiss={() => setProfileError(null)}
+                                />
+                            )}
+
                             <View style={styles.queueContainer}>
                                 <Text style={styles.queueNumber}>
                                     {queueCount.toLocaleString()}
@@ -270,7 +298,7 @@ const ConnectScreen = () => {
                         >
                             <TouchableOpacity
                                 style={[styles.userTypeButton, styles.adAgencyButton]}
-                                onPress={handleAgencyEditProfile}
+                                onPress={handleBrandEditProfile}
                                 activeOpacity={0.8}
                             >
                                 <View style={styles.buttonGradient}>
@@ -285,15 +313,39 @@ const ConnectScreen = () => {
                             {/*create-outline*/}
 
                             <TouchableOpacity
-                                style={[styles.userTypeButton, styles.adAgencyButton]}
-                                onPress={handleModifyPosts}
-                                activeOpacity={0.8}
+                                style={[
+                                    styles.userTypeButton,
+                                    styles.adAgencyButton,
+                                    !profileComplete && { opacity: 0.4 }
+                                ]}
+                                onPress={profileComplete ? handleModifyPosts : undefined}
+                                activeOpacity={profileComplete ? 0.8 : 1}
+                                disabled={!profileComplete}
                             >
                                 <View style={styles.buttonGradient}>
                                     <View style={styles.iconContainer}>
                                         <Ionicons name="create-outline" size={24} color={COLORS.white} />
                                     </View>
                                     <Text style={styles.buttonText}>Edit or View Posts</Text>
+                                    <Ionicons name="arrow-forward" size={20} color={COLORS.background} />
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.userTypeButton,
+                                    styles.contentCreatorButton,
+                                    !profileComplete && { opacity: 0.4 }
+                                ]}
+                                onPress={profileComplete ? () => router.push('/(brand)/requests') : undefined}
+                                activeOpacity={profileComplete ? 0.8 : 1}
+                                disabled={!profileComplete}
+                            >
+                                <View style={styles.buttonGradient}>
+                                    <View style={styles.iconContainer}>
+                                        <Ionicons name="people" size={24} color={COLORS.white} />
+                                    </View>
+                                    <Text style={styles.buttonText}>View Requests</Text>
                                     <Ionicons name="arrow-forward" size={20} color={COLORS.background} />
                                 </View>
                             </TouchableOpacity>
@@ -314,4 +366,4 @@ const ConnectScreen = () => {
 
 
 
-export default ConnectScreen;
+export default BrandConnectScreen;

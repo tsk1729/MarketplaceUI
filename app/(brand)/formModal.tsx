@@ -2,7 +2,7 @@
 import React, { memo, useState, useEffect, useRef, ChangeEvent } from "react";
 import { COLORS } from "@/constants/theme";
 import { isAuthenticated } from "../utils/auth";
-import { localapi, marketapi } from "../../utils/api";
+import { localapi } from "../../utils/api";
 import ErrorBanner from "../components/ErrorBanner";
 
 /* -------------------------------------------------------------------------- */
@@ -216,7 +216,7 @@ export const CreatePostModal = memo(function CreatePostModal({
                 };
                 const file = formData.restaurantImage || undefined;
 
-                const { success, message } = await marketapi.putMultipart("update_post", fields, file as any);
+                const { success, message } = await localapi.putMultipart("update_post", fields, file as any);
                 if (!success) {
                     setError(message || "Failed to update post");
                     setIsSubmitting(false);
@@ -230,7 +230,7 @@ export const CreatePostModal = memo(function CreatePostModal({
                 };
                 const file = formData.restaurantImage || undefined;
 
-                const { success, message } = await marketapi.postMultipart("posts", fields, file as any);
+                const { success, message } = await localapi.postMultipart("posts", fields, file as any);
                 if (!success) {
                     setError(message || "Failed to create post");
                     setIsSubmitting(false);

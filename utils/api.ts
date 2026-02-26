@@ -1,5 +1,8 @@
 import { Platform } from 'react-native';
 
+// Toggle this feature flag to globally switch standard UI requests between the locahost dev server and production marketplace servers
+export const IS_DEV_MODE = false;
+
 // Define multiple backend URLs
 const API_URLS = {
     market: 'https://marketapi.owlit.in/',
@@ -200,7 +203,26 @@ const createApiMethods = (baseUrl: string) => {
         }
     };
 
-    return { get, post, put, postMultipart, putMultipart, del };
+    const patch = async (endpoint: string, body: any) => {
+        try {
+            const res = await fetch(`${baseUrl}${endpoint}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                const msg = data?.message || `PATCH ${endpoint} failed: ${res.status}`;
+                return { success: false, message: msg, status: res.status };
+            }
+            return { success: true, data };
+        } catch (err: any) {
+            const msg = err?.message || 'Unexpected error occurred';
+            return { success: false, message: msg };
+        }
+    };
+
+    return { get, post, put, patch, postMultipart, putMultipart, del };
 };
 
 // Create service objects for each backend
@@ -208,7 +230,7 @@ export const marketapi = createApiMethods(API_URLS.market);
 export const mainapi = createApiMethods(API_URLS.main);
 export const authapi = createApiMethods(API_URLS.auth);
 export const analyticsapi = createApiMethods(API_URLS.analytics);
-export const localapi = createApiMethods(API_URLS.local);
+export const localapi = IS_DEV_MODE ? createApiMethods(API_URLS.local) : marketapi;
 
 // Export types and configuration for external use
 export { ApiService, API_URLS };

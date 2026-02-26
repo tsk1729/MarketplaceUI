@@ -6,13 +6,17 @@ import { Text, TouchableOpacity, View, Animated, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { isAuthenticated, getUserName, signOut } from '../utils/auth';
+import { localapi } from '../../utils/api';
+import ErrorBanner from '../components/ErrorBanner';
 import { styles } from './styles';
 
 const ConnectScreen = () => {
     const [isLoading, setIsLoading] = useState(true);
+    const [showBanner, setShowBanner] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);
     const [userName, setUserName] = useState('User');
     const [queueCount, setQueueCount] = useState(0);
+    const [profileComplete, setProfileComplete] = useState(false);
     const router = useRouter();
 
     // Animation refs
@@ -38,6 +42,17 @@ const ConnectScreen = () => {
                 // Get user name
                 const name = await getUserName();
                 setUserName(name);
+
+                // Check profile completeness
+                const checkRes = await localapi.get(`creator/profile-check?user_id=${currentUserId}`);
+                if (checkRes.success) {
+                    const { is_complete, missing_fields } = checkRes.data;
+                    setProfileComplete(is_complete);
+
+                    if (!is_complete) {
+                        console.log('Profile incomplete. Missing:', missing_fields);
+                    }
+                }
             } catch (error) {
                 console.error('Error initializing user:', error);
             } finally {
@@ -115,11 +130,22 @@ const ConnectScreen = () => {
             }),
         ]).start();
 
-        router.push('/creator/creatorProfileEdit');
+        router.push('/influencer/influencerProfileEdit');
     };
 
 
     const goToBrandMarketPlace = async () => {
+        if (!profileComplete) {
+            // Optional: You could show a specialized UI modal/Notice here instead of native alert
+            alert("Please complete your Influencer Profile (including adding at least one social media link) before accessing the Marketplace.");
+            // Also animate to draw attention to Edit Profile button
+            Animated.sequence([
+                Animated.timing(buttonScale, { toValue: 1.1, duration: 150, useNativeDriver: true }),
+                Animated.timing(buttonScale, { toValue: 1, duration: 150, useNativeDriver: true }),
+            ]).start();
+            return;
+        }
+
         // Button press animation
         Animated.sequence([
             Animated.timing(buttonScale, {
@@ -133,8 +159,8 @@ const ConnectScreen = () => {
                 useNativeDriver: true,
             }),
         ]).start();
-        router.push('/creator/posts/posts');
 
+        router.push('/influencer/posts/posts');
     };
 
     const handleSignOut = async () => {
@@ -229,6 +255,13 @@ const ConnectScreen = () => {
                                 Welcome to Brands Market Place
                             </Animated.Text>
 
+                            <ErrorBanner
+                                visible={!profileComplete && showBanner}
+                                type="info"
+                                error="Please complete your profile details and link at least one social media account to access the Marketplace."
+                                onDismiss={() => setShowBanner(false)}
+                            />
+
                             <View style={styles.queueContainer}>
                                 <Text style={styles.queueNumber}>
                                     {queueCount.toLocaleString()}
@@ -262,16 +295,33 @@ const ConnectScreen = () => {
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={[styles.userTypeButton, styles.contentCreatorButton]}
-                                // onPress={handleCreatorPress}
+                                style={[
+                                    styles.userTypeButton,
+                                    styles.contentCreatorButton,
+                                    !profileComplete && { opacity: 0.6 } // Dim to indicate disabled status
+                                ]}
                                 onPress={goToBrandMarketPlace}
                                 activeOpacity={0.8}
                             >
                                 <View style={styles.buttonGradient}>
-                                    <View style={styles.iconContainer}>
-                                        <Ionicons name="camera" size={24} color={COLORS.white} />
+                                    <View style={[styles.iconContainer, !profileComplete && { backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>
+                                        <Ionicons name={profileComplete ? "camera" : "lock-closed"} size={24} color={COLORS.white} />
                                     </View>
                                     <Text style={styles.buttonText}>Check Marketplace</Text>
+                                    <Ionicons name="arrow-forward" size={20} color={COLORS.background} />
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.userTypeButton, styles.adAgencyButton, { marginTop: 8 }]}
+                                onPress={() => router.push('/influencer/mySubmissions')}
+                                activeOpacity={0.8}
+                            >
+                                <View style={styles.buttonGradient}>
+                                    <View style={styles.iconContainer}>
+                                        <Ionicons name="document-text" size={24} color={COLORS.white} />
+                                    </View>
+                                    <Text style={styles.buttonText}>My Applications</Text>
                                     <Ionicons name="arrow-forward" size={20} color={COLORS.background} />
                                 </View>
                             </TouchableOpacity>

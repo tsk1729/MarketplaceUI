@@ -20,7 +20,7 @@ import {
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { COLORS } from "@/constants/theme";
-import { marketapi,localapi } from "../../utils/api";
+import { localapi } from "../../utils/api";
 import { CreatePostModal } from "./formModal";
 import { isAuthenticated } from "@/app/utils/auth";
 // import { AutomationButton } from "../components/AutomationButton"
@@ -30,7 +30,7 @@ import { isAuthenticated } from "@/app/utils/auth";
 /* -------------------------------------------------------------------------- */
 
 type APIRestaurantPost = {
-    _id:string;
+    _id: string;
     restaurantName: string;
     description: string;
     itemsToPromote?: string;
@@ -51,7 +51,7 @@ type APIRestaurantPost = {
     image?: string;
     category?: string;
     postId?: string;
-    status?:string
+    status?: string
 };
 
 const moneyNum = (s?: string) =>
@@ -63,11 +63,11 @@ const moneyNum = (s?: string) =>
 
 const Header = memo(
     ({
-         search,
-         setSearch,
-         sort,
-         setSort,
-     }: {
+        search,
+        setSearch,
+        sort,
+        setSort,
+    }: {
         search: string;
         setSearch: (s: string) => void;
         sort: string;
@@ -149,10 +149,10 @@ const Header = memo(
 
 const RestaurantCard = memo(
     ({
-         item,
-         width,
-         onAutomation,
-     }: {
+        item,
+        width,
+        onAutomation,
+    }: {
         item: APIRestaurantPost;
         width: number;
         onAutomation: () => void;
@@ -206,8 +206,8 @@ const RestaurantCard = memo(
                                 item.status === "active"
                                     ? styles.statusActive
                                     : item.status === "pause"
-                                    ? styles.statusPaused
-                                    : styles.statusStopped
+                                        ? styles.statusPaused
+                                        : styles.statusStopped
                             ]}>
                                 <Text style={styles.statusTagText}>
                                     {item.status === "active" && "Active"}
@@ -299,7 +299,7 @@ export default function RestaurantOffersGridScreen() {
         try {
             const auth = await isAuthenticated();
             const uid = auth?.userId;
-            const { success, data } = await marketapi.get("posts?user_id=" + uid);
+            const { success, data } = await localapi.get("posts?user_id=" + uid);
             let normalizedPosts: any[] = [];
             if (success && data) {
                 if (Array.isArray(data.posts)) {
@@ -316,10 +316,7 @@ export default function RestaurantOffersGridScreen() {
         }
     }, []);
 
-    useEffect(() => {
-        fetchRestaurants();
-    }, []);
-
+    // useFocusEffect handles both initial load and re-focus (no need for a separate useEffect)
     useFocusEffect(
         useCallback(() => {
             fetchRestaurants();

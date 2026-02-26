@@ -78,6 +78,19 @@ export const styles = StyleSheet.create({
         paddingTop: 18,
         textAlignVertical: 'top',
     },
+    socialRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        marginBottom: 16,
+        width: '100%',
+    },
+    socialInputContainer: {
+        flex: 2,
+    },
+    socialFollowerContainer: {
+        flex: 1,
+    },
     errorText: {
         color: COLORS.error,
         fontSize: 14,

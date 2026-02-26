@@ -14,9 +14,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { isAuthenticated } from "@/app/utils/auth";
-import { marketapi } from "@/utils/api";
+import { localapi } from "@/utils/api";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
-import { CreatePostModal } from "@/app/(agency)/formModal";
+import { CreatePostModal } from "@/app/(brand)/formModal";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES */
@@ -48,6 +48,7 @@ type APIRestaurantPost = {
 };
 
 type SubmissionType = {
+    status?: 'pending' | 'accepted' | 'rejected';
     link: string;
     description?: string;
     verification_status?: string;
@@ -178,7 +179,7 @@ const SubmitLinkForm = ({
             }
 
             // API: POST /influencer/{user_id}/proofs?post_id={post_id}
-            const res = await marketapi.post(`influencer/${auth.userId}/proofs?post_id=${postId}`, {
+            const res = await localapi.post(`influencer/${auth.userId}/proofs?post_id=${postId}`, {
                 description: notes,
                 link: link
             });
@@ -262,11 +263,15 @@ const SubmitLinkForm = ({
     );
 };
 
-const TrackingSteps = ({ status, link, verificationStatus, paymentStatus }: { status: boolean | null, link: string | undefined, verificationStatus: string | undefined, paymentStatus: string | undefined }) => {
+const TrackingSteps = ({ subStatus, link, verificationStatus, paymentStatus }: { subStatus: string | undefined, link: string | undefined, verificationStatus: string | undefined, paymentStatus: string | undefined }) => {
+    const isAccepted = subStatus === 'accepted';
+    const isRejected = subStatus === 'rejected';
+
     const steps = [
-        { label: "Subscribed", active: !!status },
+        { label: "Requested", active: !!subStatus || !!link },
+        { label: isRejected ? "Rejected" : "Accepted", active: isAccepted || isRejected || !!link, error: isRejected },
         { label: "Proof Submitted", active: !!link },
-        { label: "Review Completed", active: verificationStatus === "approved" },
+        { label: "Review Completed", active: verificationStatus === "approved" || paymentStatus === "paid" },
         { label: "Credited Money", active: paymentStatus === "paid" }
     ];
 
@@ -279,14 +284,14 @@ const TrackingSteps = ({ status, link, verificationStatus, paymentStatus }: { st
                         <View style={{ alignItems: 'center', marginRight: 12 }}>
                             <View style={{
                                 width: 18, height: 18, borderRadius: 9,
-                                backgroundColor: step.active ? COLORS.primary : COLORS.surfaceLight,
-                                borderWidth: 1, borderColor: step.active ? COLORS.primary : COLORS.grey,
+                                backgroundColor: step.error ? COLORS.error : (step.active ? COLORS.primary : COLORS.surfaceLight),
+                                borderWidth: 1, borderColor: step.error ? COLORS.error : (step.active ? COLORS.primary : COLORS.grey),
                                 alignItems: 'center', justifyContent: 'center'
                             }}>
-                                {step.active && <Ionicons name="checkmark" size={12} color={COLORS.background} />}
+                                {step.error ? <Ionicons name="close" size={12} color={COLORS.background} /> : step.active && <Ionicons name="checkmark" size={12} color={COLORS.background} />}
                             </View>
                             {idx < steps.length - 1 && (
-                                <View style={{ width: 2, height: 24, backgroundColor: steps[idx + 1].active ? COLORS.primary : COLORS.surfaceLight, marginVertical: 4 }} />
+                                <View style={{ width: 2, height: 24, backgroundColor: steps[idx + 1].active || steps[idx + 1].error ? (steps[idx + 1].error ? COLORS.error : COLORS.primary) : COLORS.surfaceLight, marginVertical: 4 }} />
                             )}
                         </View>
                         <Text style={{ color: step.active ? COLORS.white : COLORS.grey, fontSize: 14, fontWeight: step.active ? "600" : "400", marginTop: -2 }}>
@@ -338,9 +343,9 @@ const PostSubmissionSection = ({
     if (!actuallySubscribed) {
         return (
             <View>
-                <Text style={localStyles.restaurantName}>Join Campaign</Text>
+                <Text style={localStyles.restaurantName}>Apply to Campaign</Text>
                 <Text style={[localStyles.description, { marginBottom: 20 }]}>
-                    Subscribe to this post to start your submission.
+                    Submit a request to the brand to participate in this campaign.
                 </Text>
                 <TouchableOpacity
                     style={[localStyles.submitBtn, { marginHorizontal: 0, marginTop: 0, backgroundColor: COLORS.primary }]}
@@ -350,7 +355,7 @@ const PostSubmissionSection = ({
                     {subscribeLoading ? (
                         <ActivityIndicator color={COLORS.background} />
                     ) : (
-                        <Text style={{ color: COLORS.background, fontWeight: '700', fontSize: 16 }}>Subscribe</Text>
+                        <Text style={{ color: COLORS.background, fontWeight: '700', fontSize: 16 }}>Request to Join</Text>
                     )}
                 </TouchableOpacity>
             </View>
@@ -358,20 +363,22 @@ const PostSubmissionSection = ({
     }
 
     // 3. Subscribed -> Show Tracker & Submission Form/Status
+    const status = submission?.status || (isSubscribed ? 'pending' : undefined);
+
     return (
         <View>
             <TrackingSteps
-                status={isSubscribed}
+                subStatus={status}
                 link={submission?.link}
                 verificationStatus={submission?.verification_status}
                 paymentStatus={submission?.payment_status}
             />
 
-            {submission && !showEditForm ? (
+            {submission?.link && !showEditForm ? (
                 <View style={{ marginTop: 10 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                         <Ionicons name="checkmark-done-circle" size={24} color={COLORS.primary} />
-                        <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 18, marginLeft: 8 }}>Submission Received</Text>
+                        <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 18, marginLeft: 8 }}>Proof Submitted</Text>
                     </View>
 
                     <View style={{ padding: 16, borderRadius: 8, backgroundColor: COLORS.surfaceLight, width: '100%' }}>
@@ -387,10 +394,10 @@ const PostSubmissionSection = ({
 
                     <TouchableOpacity style={{ marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }} onPress={() => setShowEditForm(true)}>
                         <Ionicons name="create-outline" size={20} color={COLORS.white} />
-                        <Text style={{ color: COLORS.white, marginLeft: 6, textDecorationLine: "underline" }}>Edit submission</Text>
+                        <Text style={{ color: COLORS.white, marginLeft: 6, textDecorationLine: "underline" }}>Edit proof submission</Text>
                     </TouchableOpacity>
                 </View>
-            ) : (
+            ) : status === 'accepted' || (submission?.link && showEditForm) ? (
                 <SubmitLinkForm
                     initialLink={submission?.link || ""}
                     initialNotes={submission?.description || ""}
@@ -400,7 +407,7 @@ const PostSubmissionSection = ({
                         setSubmission(prev => ({
                             link,
                             description: notes,
-                            // Preserve existing statuses if any, or default to pending
+                            status: prev?.status || 'pending',
                             verification_status: prev?.verification_status || 'pending',
                             payment_status: prev?.payment_status || 'pending'
                         }));
@@ -408,6 +415,18 @@ const PostSubmissionSection = ({
                     }}
                     onCancel={submission?.link ? () => setShowEditForm(false) : undefined}
                 />
+            ) : status === 'rejected' ? (
+                <View style={{ padding: 20, backgroundColor: COLORS.error + '15', borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.error + '40' }}>
+                    <Ionicons name="close-circle-outline" size={36} color={COLORS.error} style={{ marginBottom: 12 }} />
+                    <Text style={{ color: COLORS.error, fontSize: 16, fontWeight: '600', textAlign: 'center' }}>Request Declined</Text>
+                    <Text style={{ color: COLORS.white, textAlign: 'center', marginTop: 6, fontSize: 14, opacity: 0.8 }}>The brand has decided not to proceed with your application for this post.</Text>
+                </View>
+            ) : (
+                <View style={{ padding: 20, backgroundColor: COLORS.surfaceLight, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.grey + '40' }}>
+                    <Ionicons name="time-outline" size={36} color="#F59E0B" style={{ marginBottom: 12 }} />
+                    <Text style={{ color: COLORS.white, fontSize: 16, fontWeight: '600', textAlign: 'center' }}>Awaiting Approval</Text>
+                    <Text style={{ color: COLORS.grey, textAlign: 'center', marginTop: 6, fontSize: 14 }}>The brand is reviewing your request. You can submit your proof link once approved.</Text>
+                </View>
             )}
         </View>
     );
@@ -454,7 +473,7 @@ const RestaurantDetailsScreen: React.FC = () => {
             const auth = await isAuthenticated();
             if (!auth?.userId) throw new Error("Unauthorized");
 
-            const res = await marketapi.get(`post?user_id=${auth.userId}&post_id=${postId}`);
+            const res = await localapi.get(`post?user_id=${auth.userId}&post_id=${postId}`);
 
             if (!res.success || !res.data?.data || Object.keys(res.data.data).length === 0) {
                 setError("Post not found");
@@ -501,27 +520,30 @@ const RestaurantDetailsScreen: React.FC = () => {
                 if (!auth?.userId) return;
 
                 // API: GET /brands/{user_id}/brand-subscriptions/{post_id}
-                const res = await marketapi.get(`brands/${auth.userId}/brand-subscriptions/${postId}`);
+                const res = await localapi.get(`brands/${auth.userId}/brand-subscriptions/${postId}`);
 
                 if (!cancelled) {
-                    if (res.success && res.data) {
+                    if (res.success && res.data && res.data.status === true) {
                         // Use response from api
-                        // { "status": boolean, "link": string | null, "description": ... }
+                        setIsSubscribed(true);
 
-                        setIsSubscribed(res.data.status === true);
-
-                        if (res.data.link) {
+                        if (res.data.link || res.data.submission_status) {
                             setSubmission({
-                                link: res.data.link,
+                                status: res.data.submission_status || 'pending',
+                                link: res.data.link || '',
                                 description: res.data.description,
                                 verification_status: res.data.verification_status,
                                 payment_status: res.data.payment_status
                             });
                         } else {
-                            setSubmission(null);
+                            // Subscribed but no actual submission entry yet
+                            setSubmission({
+                                status: 'pending',
+                                link: '',
+                            });
                         }
                     } else {
-                        // Fallback or error state
+                        // User is not subscribed or API returned empty/false
                         setIsSubscribed(false);
                         setSubmission(null);
                     }
@@ -553,7 +575,7 @@ const RestaurantDetailsScreen: React.FC = () => {
             }
 
             // API: POST /brands/{user_id}/brand-subscriptions?post_id={post_id}
-            const res = await marketapi.post(`brands/${auth.userId}/brand-subscriptions?post_id=${postId}`, {});
+            const res = await localapi.post(`brands/${auth.userId}/brand-subscriptions?post_id=${postId}`, {});
 
             if (res.success) {
                 setIsSubscribed(true);

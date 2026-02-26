@@ -64,36 +64,36 @@ export default function Login() {
     }, [isInitializing]);
 
     const initializeAuth = async () => {
-      try {
-        const { isAuthenticated: authenticated, userId } = await isAuthenticated();
-        if (authenticated && userId) {
-          // Get user type using proper auth utility function
-          const userType = await getUserType();
+        try {
+            const { isAuthenticated: authenticated, userId } = await isAuthenticated();
+            if (authenticated && userId) {
+                // Get user type using proper auth utility function
+                const userType = await getUserType();
 
-          // Check if navigation is ready
-          if (navigation?.isReady()) {
-            // Route based on user type
-            if (userType === 'brand') {
-              router.replace("/(connect)/agency");
-            } else {
-              router.replace("/(connect)/influencer");
+                // Check if navigation is ready
+                if (navigation?.isReady()) {
+                    // Route based on user type
+                    if (userType === 'brand') {
+                        router.replace("/(connect)/brand");
+                    } else {
+                        router.replace("/(connect)/influencer");
+                    }
+                } else {
+                    // Fallback: try again after a short delay
+                    setTimeout(() => {
+                        if (userType === 'brand') {
+                            router.replace("/(connect)/brand");
+                        } else {
+                            router.replace("/(connect)/influencer");
+                        }
+                    }, 300);
+                }
             }
-          } else {
-            // Fallback: try again after a short delay
-            setTimeout(() => {
-              if (userType === 'brand') {
-                router.replace("/(connect)/agency");
-              } else {
-                router.replace("/(connect)/influencer");
-              }
-            }, 300);
-          }
+        } catch (error) {
+            console.error('Initialization error:', error);
+        } finally {
+            setIsInitializing(false);
         }
-      } catch (error) {
-        console.error('Initialization error:', error);
-      } finally {
-        setIsInitializing(false);
-      }
     };
 
     const buttonScaleAnim = useRef(new Animated.Value(1)).current;
@@ -331,7 +331,7 @@ export default function Login() {
                                 >
                                     <Text style={styles.marketplaceTitle}>🎯 Influencer Marketplace</Text>
                                     <Text style={styles.marketplaceDescription}>
-                                        Join thousands of creators and agencies building successful partnerships
+                                        Join thousands of influencers and brands building successful partnerships
                                     </Text>
                                 </Animated.View>
                             </Animated.View>
@@ -463,9 +463,9 @@ export default function Login() {
                                 transform: [{ translateY: slideAnim }],
                             }
                         ]}
-                                            >
-                            Owlit
-                        </Animated.Text>
+                    >
+                        Owlit
+                    </Animated.Text>
                     <Animated.Text
                         style={[
                             styles.tagline,
@@ -541,7 +541,7 @@ export default function Login() {
                     >
                         <Text style={styles.marketplaceTitle}>🎯 Influencer Marketplace</Text>
                         <Text style={styles.marketplaceDescription}>
-                            Join thousands of creators and agencies building successful partnerships
+                            Join thousands of influencers and brands building successful partnerships
                         </Text>
                     </Animated.View>
 

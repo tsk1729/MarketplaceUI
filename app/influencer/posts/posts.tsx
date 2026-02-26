@@ -22,7 +22,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { COLORS } from "@/constants/theme";
 import { isAuthenticated } from "@/app/utils/auth";
 
-import { marketapi, localapi } from "@/utils/api";
+import { localapi } from "@/utils/api";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                      */
@@ -288,7 +288,7 @@ export default function RestaurantOffersGridScreen() {
 
             // Using localapi as requested
             // Endpoint: /brand/posts based on curl "http://127.0.0.1:8000/brand/posts..."
-            const { success, data } = await marketapi.get(`brand/posts?${params.toString()}`);
+            const { success, data } = await localapi.get(`brand/posts?${params.toString()}`);
 
             if (success && data) {
                 const newPosts = Array.isArray(data.data) ? data.data : [];
@@ -363,7 +363,7 @@ export default function RestaurantOffersGridScreen() {
                                     key={item.postId || item._id}
                                     item={item}
                                     width={cardWidth}
-                                    onAutomation={() => router.push({ pathname: "/creator/post/postDetails", params: { postId: item._id } })}
+                                    onAutomation={() => router.push({ pathname: "/influencer/post/postDetails", params: { postId: item._id } })}
                                 />
                             ))}
                         </View>

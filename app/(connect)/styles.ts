@@ -196,6 +196,24 @@ export const styles = StyleSheet.create({
             textShadowRadius: 0.5,
         }),
     },
+    incompleteBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 59, 48, 0.15)', // light red background
+        borderColor: 'rgba(255, 59, 48, 0.4)',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 24,
+        marginHorizontal: 16,
+        gap: 12,
+    },
+    incompleteBannerText: {
+        flex: 1,
+        color: COLORS.white,
+        fontSize: 14,
+        lineHeight: 20,
+    },
     decorativeElements: {
         position: 'absolute',
         top: 0,

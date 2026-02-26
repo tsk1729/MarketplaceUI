@@ -31,7 +31,7 @@ export default function RootIndex() {
                     console.log('📋 User type:', userType);
 
                     // Route based on user type
-                    const targetRoute = userType === 'brand' ? "/(connect)/agency" : "/(connect)/influencer";
+                    const targetRoute = userType === 'brand' ? "/(connect)/brand" : "/(connect)/influencer";
                     console.log('🎯 Routing to:', targetRoute);
 
                     router.replace(targetRoute);
