@@ -31,7 +31,8 @@ import { isAuthenticated } from "@/app/utils/auth";
 
 type APIRestaurantPost = {
     _id: string;
-    restaurantName: string;
+    brandSubject?: string;
+    restaurantName?: string;
     description: string;
     itemsToPromote?: string;
     minFollowers?: string;
@@ -43,6 +44,7 @@ type APIRestaurantPost = {
         unit?: string;
         reward?: string;
     }[];
+    postImage?: string;
     restaurantImage?: string;
     googleMapsLink?: string;
     address?: string;
@@ -167,7 +169,7 @@ const RestaurantCard = memo(
             <View style={[styles.card, { width }]}>
                 {Platform.OS === "web" ? (
                     <img
-                        src={item.image || item.restaurantImage || ""}
+                        src={item.postImage || item.image || item.restaurantImage || ""}
                         style={{
                             width: "100%",
                             height: 160,
@@ -176,12 +178,12 @@ const RestaurantCard = memo(
                             borderTopRightRadius: 14,
                             background: "#222"
                         }}
-                        alt={item.restaurantName || "Restaurant"}
+                        alt={item.brandSubject || item.restaurantName || "Brand"}
                         onError={e => { (e.target as HTMLImageElement).src = "https://ik.imagekit.io/owlit/agency/passport_photo_HMktjeYkg.jpg" }}
                     />
                 ) : (
                     <Image
-                        source={{ uri: item.image || item.restaurantImage || "" }}
+                        source={{ uri: item.postImage || item.image || item.restaurantImage || "" }}
                         style={styles.cardImg}
                         defaultSource={require("../../assets/images/influencer.png")}
                     />
@@ -190,7 +192,7 @@ const RestaurantCard = memo(
 
                 <View style={styles.cardBody}>
                     <Text style={styles.cardName} numberOfLines={1} ellipsizeMode="tail">
-                        {item.restaurantName || "Untitled"}
+                        {item.brandSubject || item.restaurantName || "Untitled"}
                     </Text>
                     <Text style={styles.cardItem} numberOfLines={2} ellipsizeMode="tail">
                         {(item.description?.trim() ||
@@ -331,7 +333,7 @@ export default function RestaurantOffersGridScreen() {
         if (q) {
             list = list.filter(
                 (r) =>
-                    r.restaurantName?.toLowerCase().includes(q) ||
+                    (r.brandSubject || r.restaurantName)?.toLowerCase().includes(q) ||
                     r.address?.toLowerCase().includes(q) ||
                     r.itemsToPromote?.toLowerCase().includes(q) ||
                     r.description?.toLowerCase().includes(q)
@@ -405,7 +407,7 @@ export default function RestaurantOffersGridScreen() {
                     >
                         {filtered.map((item) => (
                             <RestaurantCard
-                                key={item.postId || item.restaurantName}
+                                key={item.postId || item.brandSubject || item.restaurantName}
                                 item={item}
                                 width={cardWidth}
                                 onAutomation={() => automate(item)}

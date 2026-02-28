@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View, Text, StyleSheet, ActivityIndicator, ScrollView,
-    TouchableOpacity, RefreshControl, Platform,
+    TouchableOpacity, RefreshControl, Platform, Linking, Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -27,7 +27,7 @@ type Submission = {
     _id: string;
     post_id: string;
     influencer_id: string;
-    status: 'pending' | 'accepted' | 'rejected';
+    status: 'requested' | 'accepted' | 'rejected' | 'proof_submitted' | 'review_completed' | 'credited_money';
     updated_at: string;
     post_title?: string;
     influencer_name?: string;
@@ -51,23 +51,36 @@ const formatFollowers = (num: number | undefined): string => {
     return num.toString();
 };
 
-type TabKey = 'pending' | 'accepted' | 'rejected' | 'all';
+type TabKey = 'requested' | 'accepted' | 'proof_submitted' | 'review_completed' | 'credited_money' | 'rejected' | 'all';
 
 const TABS: { key: TabKey; label: string; icon: string; color: string }[] = [
-    { key: 'pending', label: 'Pending', icon: 'time-outline', color: COLORS.pending },
+    { key: 'requested', label: 'Pending', icon: 'time-outline', color: COLORS.pending },
     { key: 'accepted', label: 'Approved', icon: 'checkmark-circle-outline', color: COLORS.accepted },
+    { key: 'proof_submitted', label: 'Proof Submitted', icon: 'document-attach-outline', color: COLORS.primary },
+    { key: 'review_completed', label: 'Review Completed', icon: 'shield-checkmark-outline', color: COLORS.primary },
+    { key: 'credited_money', label: 'Credited Money', icon: 'cash-outline', color: COLORS.primary },
     { key: 'rejected', label: 'Rejected', icon: 'close-circle-outline', color: COLORS.rejected },
     { key: 'all', label: 'All', icon: 'list-outline', color: COLORS.greyLight },
 ];
 
 export default function BrandRequestsScreen() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<TabKey>('pending');
+    const [activeTab, setActiveTab] = useState<TabKey>('requested');
     const [submissions, setSubmissions] = useState<Submission[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+    // Payment Modal State
+    const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+    const [selectedUserForPayment, setSelectedUserForPayment] = useState<Submission | null>(null);
+
+    // Hardcoded wallet balance for MVP
+    const walletBalance = 5000;
+    // For MVP, we'll assume the payment is a fixed proportion or the whole post reward. Setting a dummy 500 for now.
+    const paymentAmount = 500;
+
     const pollRef = useRef<NodeJS.Timeout | null>(null);
 
     const fetchSubmissions = useCallback(async (isRefresh = false) => {
@@ -99,16 +112,20 @@ export default function BrandRequestsScreen() {
         return () => { if (pollRef.current) clearInterval(pollRef.current); };
     }, [fetchSubmissions]);
 
-    const handleAction = async (sub: Submission, action: 'accept' | 'reject') => {
+    const handleAction = async (sub: Submission, action: 'accept' | 'reject' | 'review-complete' | 'undo-review-complete' | 'credit-money') => {
         setActionLoading(sub._id + action);
         try {
             const auth = await isAuthenticated();
             if (!auth?.userId) throw new Error('Unauthorized');
             const res = await localapi.patch(`${sub.post_id}/submissions/${sub.influencer_id}/${action}`, {});
             if (res.success) {
-                const newStatus = (action === 'accept' ? 'accepted' : 'rejected') as Submission['status'];
+                const newStatus = action === 'accept' ? 'accepted'
+                    : action === 'reject' ? 'rejected'
+                        : action === 'review-complete' ? 'review_completed'
+                            : action === 'undo-review-complete' ? 'proof_submitted'
+                                : 'credited_money';
                 setSubmissions(prev =>
-                    prev.map(s => s._id === sub._id ? { ...s, status: newStatus } : s)
+                    prev.map(s => s._id === sub._id ? { ...s, status: newStatus as Submission['status'] } : s)
                         .filter(s => activeTab === 'all' || s.status === activeTab)
                 );
             } else {
@@ -119,6 +136,13 @@ export default function BrandRequestsScreen() {
         } finally {
             setActionLoading(null);
         }
+    };
+
+    const confirmPayment = async () => {
+        if (!selectedUserForPayment) return;
+        await handleAction(selectedUserForPayment, 'credit-money');
+        setPaymentModalVisible(false);
+        setSelectedUserForPayment(null);
     };
 
     const activeTabConfig = TABS.find(t => t.key === activeTab)!;
@@ -138,27 +162,29 @@ export default function BrandRequestsScreen() {
 
             {/* Tabs */}
             <View style={styles.tabBar}>
-                {TABS.map(tab => {
-                    const isActive = activeTab === tab.key;
-                    return (
-                        <TouchableOpacity
-                            key={tab.key}
-                            style={[styles.tab, isActive && { borderBottomColor: tab.color, borderBottomWidth: 2 }]}
-                            onPress={() => setActiveTab(tab.key)}
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons
-                                name={tab.icon as any}
-                                size={16}
-                                color={isActive ? tab.color : COLORS.grey}
-                                style={{ marginBottom: 2 }}
-                            />
-                            <Text style={[styles.tabText, isActive && { color: tab.color }]}>
-                                {tab.label}
-                            </Text>
-                        </TouchableOpacity>
-                    );
-                })}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+                    {TABS.map(tab => {
+                        const isActive = activeTab === tab.key;
+                        return (
+                            <TouchableOpacity
+                                key={tab.key}
+                                style={[styles.tab, isActive && { borderBottomColor: tab.color, borderBottomWidth: 2 }]}
+                                onPress={() => setActiveTab(tab.key)}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons
+                                    name={tab.icon as any}
+                                    size={16}
+                                    color={isActive ? tab.color : COLORS.grey}
+                                    style={{ marginBottom: 2 }}
+                                />
+                                <Text style={[styles.tabText, isActive && { color: tab.color }]}>
+                                    {tab.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
             </View>
 
             {/* Error banner */}
@@ -197,7 +223,7 @@ export default function BrandRequestsScreen() {
                             </View>
                             <Text style={styles.emptyTitle}>No {activeTab !== 'all' ? activeTab : ''} requests</Text>
                             <Text style={styles.emptySubtitle}>
-                                {activeTab === 'pending'
+                                {activeTab === 'requested'
                                     ? 'New applications from influencers will appear here.'
                                     : `You have no ${activeTab} applications yet.`}
                             </Text>
@@ -268,7 +294,7 @@ export default function BrandRequestsScreen() {
                                             <View style={[styles.statusBadge, { borderColor: statusConfig.color + '55', backgroundColor: statusConfig.color + '18' }]}>
                                                 <Ionicons name={statusConfig.icon as any} size={12} color={statusConfig.color} style={{ marginRight: 4 }} />
                                                 <Text style={[styles.statusText, { color: statusConfig.color }]}>
-                                                    {sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                                                    {statusConfig.label}
                                                 </Text>
                                             </View>
                                         </View>
@@ -277,8 +303,8 @@ export default function BrandRequestsScreen() {
                                             Applied {new Date(sub.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                         </Text>
 
-                                        {/* Actions — only for pending */}
-                                        {sub.status === 'pending' && (
+                                        {/* Actions */}
+                                        {sub.status === 'requested' && (
                                             <View style={styles.actionRow}>
                                                 <TouchableOpacity
                                                     style={[styles.actionBtn, styles.rejectBtn, isActioning && { opacity: 0.5 }]}
@@ -300,6 +326,58 @@ export default function BrandRequestsScreen() {
                                                 </TouchableOpacity>
                                             </View>
                                         )}
+                                        {/* Proof Submitted text / Complete Review action */}
+                                        {(sub as any).link && sub.status === 'proof_submitted' && (
+                                            <View style={styles.proofSection}>
+                                                <Text style={styles.proofLabel}>Proof Link</Text>
+                                                <TouchableOpacity onPress={() => Linking.openURL((sub as any).link)}>
+                                                    <Text style={styles.proofLink} selectable>{(sub as any).link}</Text>
+                                                </TouchableOpacity>
+                                                {(sub as any).description && (
+                                                    <View style={{ marginTop: 6 }}>
+                                                        <Text style={styles.proofLabel}>Notes</Text>
+                                                        <Text style={styles.proofNotes}>{(sub as any).description}</Text>
+                                                    </View>
+                                                )}
+                                                <View style={[styles.actionRow, { marginTop: 12 }]}>
+                                                    <TouchableOpacity
+                                                        style={[styles.actionBtn, styles.acceptBtn, isActioning && { opacity: 0.5 }]}
+                                                        disabled={!!isActioning}
+                                                        onPress={() => handleAction(sub, 'review-complete')}
+                                                    >
+                                                        {actionLoading === sub._id + 'review-complete'
+                                                            ? <ActivityIndicator size="small" color={COLORS.background} />
+                                                            : <Text style={styles.actionText}>Complete Review</Text>}
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </View>
+                                        )}
+                                        {/* Review Completed action -> Credit Money or Undo */}
+                                        {sub.status === 'review_completed' && (
+                                            <View style={[styles.actionRow, { marginTop: 8 }]}>
+                                                <TouchableOpacity
+                                                    style={[styles.actionBtn, styles.rejectBtn, isActioning && { opacity: 0.5 }]}
+                                                    disabled={!!isActioning}
+                                                    onPress={() => handleAction(sub, 'undo-review-complete')}
+                                                >
+                                                    {actionLoading === sub._id + 'undo-review-complete'
+                                                        ? <ActivityIndicator size="small" color={COLORS.error} />
+                                                        : <Text style={[styles.actionText, { color: COLORS.error }]}>Undo Review</Text>}
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={[styles.actionBtn, styles.acceptBtn, isActioning && { opacity: 0.5 }]}
+                                                    disabled={!!isActioning}
+                                                    onPress={() => {
+                                                        setSelectedUserForPayment(sub);
+                                                        setPaymentModalVisible(true);
+                                                    }}
+                                                >
+                                                    {actionLoading === sub._id + 'credit-money'
+                                                        ? <ActivityIndicator size="small" color={COLORS.background} />
+                                                        : <Text style={styles.actionText}>Pay Amount</Text>}
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
                                     </View>
                                 );
                             })}
@@ -307,6 +385,50 @@ export default function BrandRequestsScreen() {
                     )}
                 </ScrollView>
             )}
+
+            {/* Payment Modal */}
+            <Modal visible={paymentModalVisible} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Confirm Payment</Text>
+                            <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
+                                <Ionicons name="close" size={24} color={COLORS.grey} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.modalBody}>
+                            <Text style={styles.modalText}>You are about to credit money to the influencer.</Text>
+
+                            <View style={styles.balanceCard}>
+                                <View style={styles.balanceRow}>
+                                    <Text style={styles.balanceLabel}>Wallet Balance</Text>
+                                    <Text style={styles.balanceAmount}>₹{walletBalance}</Text>
+                                </View>
+                                <View style={styles.divider} />
+                                <View style={styles.balanceRow}>
+                                    <Text style={styles.balanceLabel}>Amount to Pay</Text>
+                                    <Text style={[styles.balanceAmount, { color: COLORS.error }]}>-₹{paymentAmount}</Text>
+                                </View>
+                                <View style={styles.divider} />
+                                <View style={styles.balanceRow}>
+                                    <Text style={[styles.balanceLabel, { color: COLORS.white, fontWeight: '600' }]}>Remaining Balance</Text>
+                                    <Text style={[styles.balanceAmount, { color: COLORS.primary }]}>₹{walletBalance - paymentAmount}</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={styles.modalFooter}>
+                            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setPaymentModalVisible(false)}>
+                                <Text style={styles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.modalConfirmBtn} onPress={confirmPayment}>
+                                <Text style={styles.modalConfirmText}>Confirm & Pay</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -328,13 +450,16 @@ const styles = StyleSheet.create({
     headerSub: { fontSize: 12, color: COLORS.grey, marginTop: 1 },
 
     tabBar: {
-        flexDirection: 'row',
         borderBottomWidth: 1, borderBottomColor: COLORS.border,
         backgroundColor: COLORS.surface,
     },
+    tabScroll: {
+        flexDirection: 'row',
+        paddingHorizontal: 8,
+    },
     tab: {
-        flex: 1, alignItems: 'center', justifyContent: 'center',
-        paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent',
+        alignItems: 'center', justifyContent: 'center',
+        paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: 'transparent',
     },
     tabText: { fontSize: 12, fontWeight: '600', color: COLORS.grey },
 
@@ -421,4 +546,29 @@ const styles = StyleSheet.create({
     rejectBtn: { backgroundColor: COLORS.error + '15', borderWidth: 1, borderColor: COLORS.error + '40' },
     acceptBtn: { backgroundColor: COLORS.primary },
     actionText: { fontSize: 14, fontWeight: '700', color: COLORS.background },
+
+    proofSection: {
+        marginTop: 12, padding: 12, backgroundColor: COLORS.surfaceLight,
+        borderRadius: 8, borderWidth: 1, borderColor: COLORS.border
+    },
+    proofLabel: { fontSize: 11, color: COLORS.grey, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+    proofLink: { fontSize: 13, color: COLORS.primary, textDecorationLine: 'underline' },
+    proofNotes: { fontSize: 14, color: COLORS.greyLight, lineHeight: 20 },
+
+    // Modal Styles
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalContent: { width: '100%', maxWidth: 400, backgroundColor: COLORS.surface, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    modalTitle: { fontSize: 18, fontWeight: '700', color: COLORS.white },
+    modalBody: { padding: 20 },
+    modalText: { color: COLORS.greyLight, fontSize: 14, marginBottom: 20 },
+    balanceCard: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: COLORS.border },
+    balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    balanceLabel: { color: COLORS.grey, fontSize: 14 },
+    balanceAmount: { color: COLORS.white, fontSize: 16, fontWeight: '600' },
+    modalFooter: { flexDirection: 'row', padding: 20, paddingTop: 0, gap: 12 },
+    modalCancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: COLORS.surfaceLight, borderWidth: 1, borderColor: COLORS.border },
+    modalCancelText: { color: COLORS.white, fontSize: 14, fontWeight: '600' },
+    modalConfirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: COLORS.primary },
+    modalConfirmText: { color: COLORS.background, fontSize: 14, fontWeight: '700' },
 });

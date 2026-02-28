@@ -30,7 +30,8 @@ import { localapi } from "@/utils/api";
 
 type APIRestaurantPost = {
     _id: string;
-    restaurantName: string;
+    brandSubject?: string;
+    restaurantName?: string;
     description: string;
     itemsToPromote?: string;
     minFollowers?: string;
@@ -42,6 +43,7 @@ type APIRestaurantPost = {
         unit?: string;
         reward?: string;
     }[];
+    postImage?: string;
     restaurantImage?: string;
     googleMapsLink?: string;
     address?: string;
@@ -157,7 +159,7 @@ const RestaurantCard = memo(
             <View style={[styles.card, { width }]}>
                 {Platform.OS === "web" ? (
                     <img
-                        src={item.image || item.restaurantImage || ""}
+                        src={item.postImage || item.image || item.restaurantImage || ""}
                         style={{
                             width: "100%",
                             height: 160,
@@ -166,19 +168,19 @@ const RestaurantCard = memo(
                             borderTopRightRadius: 14,
                             background: "#222"
                         }}
-                        alt={item.restaurantName || "Restaurant"}
+                        alt={item.brandSubject || item.restaurantName || "Brand"}
                         onError={e => { (e.target as HTMLImageElement).src = "https://ik.imagekit.io/owlit/agency/passport_photo_HMktjeYkg.jpg" }}
                     />
                 ) : (
                     <Image
-                        source={{ uri: item.image || item.restaurantImage || "" }}
+                        source={{ uri: item.postImage || item.image || item.restaurantImage || "" }}
                         style={styles.cardImg}
                         defaultSource={require("../../../assets/images/influencer.png")}
                     />
                 )}
 
                 <View style={styles.cardBody}>
-                    <Text style={styles.cardName} numberOfLines={1}>{item.restaurantName || "Untitled"}</Text>
+                    <Text style={styles.cardName} numberOfLines={1}>{item.brandSubject || item.restaurantName || "Untitled"}</Text>
                     <Text style={styles.cardItem} numberOfLines={2}>
                         {(item.description?.trim() || item.itemsToPromote?.split(",")[0] || "Special offer").replace(/\s+/g, " ")}
                     </Text>
@@ -321,7 +323,7 @@ export default function RestaurantOffersGridScreen() {
         const q = search.trim().toLowerCase();
         if (q) {
             list = list.filter(r =>
-                r.restaurantName?.toLowerCase().includes(q) ||
+                (r.brandSubject || r.restaurantName)?.toLowerCase().includes(q) ||
                 r.address?.toLowerCase().includes(q)
             );
         }

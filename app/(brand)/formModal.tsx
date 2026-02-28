@@ -26,26 +26,26 @@ type CreatePostModalProps = {
 };
 
 type FormState = {
-    restaurantName: string;
+    brandSubject: string;
     description: string;
     itemsToPromote: string;
     minFollowers: string;
     minFollowersUnit: string;
     keyValuePairs: KeyValuePair[];
-    restaurantImage: File | null; // This represents a NEW file upload
+    postImage: File | null; // This represents a NEW file upload
     googleMapsLink: string;
     address: string;
     guidelines: string;
 };
 
 const INITIAL_FORM: FormState = {
-    restaurantName: "",
+    brandSubject: "",
     description: "",
     itemsToPromote: "",
     minFollowers: "",
     minFollowersUnit: "K",
     keyValuePairs: [],
-    restaurantImage: null,
+    postImage: null,
     googleMapsLink: "",
     address: "",
     guidelines: "",
@@ -79,13 +79,13 @@ export const CreatePostModal = memo(function CreatePostModal({
             // PREFILL LOGIC
             if (initialData) {
                 setFormData({
-                    restaurantName: initialData.restaurantName || "",
+                    brandSubject: initialData.brandSubject || (initialData as any).restaurantName || "",
                     description: initialData.description || "",
                     itemsToPromote: initialData.itemsToPromote || "",
                     minFollowers: initialData.minFollowers || "",
                     minFollowersUnit: initialData.minFollowersUnit || "K",
                     keyValuePairs: initialData.keyValuePairs || [],
-                    restaurantImage: null, // Reset file input, we rely on existingImageUrl for preview
+                    postImage: null, // Reset file input, we rely on existingImageUrl for preview
                     googleMapsLink: initialData.googleMapsLink || "",
                     address: initialData.address || "",
                     guidelines: initialData.guidelines || "",
@@ -144,7 +144,7 @@ export const CreatePostModal = memo(function CreatePostModal({
                 (e.target as HTMLInputElement).value = "";
                 return;
             }
-            update("restaurantImage", file);
+            update("postImage", file);
             setImagePreview(URL.createObjectURL(file));
         }
         // Note: We don't clear the image if they cancel selection in Edit mode,
@@ -171,14 +171,14 @@ export const CreatePostModal = memo(function CreatePostModal({
 
     /* --------------------------- Submit ------------------------------- */
     const handleSubmit = async () => {
-        if (!formData.restaurantName.trim() || !formData.description.trim()) {
-            setError("Restaurant name and description are required.");
+        if (!formData.brandSubject.trim() || !formData.description.trim()) {
+            setError("Brand Subject and description are required.");
             return;
         }
 
         // VALIDATION: In create mode, image is required. In edit mode, it's optional (fallback to existing).
-        if (!isEditMode && !formData.restaurantImage) {
-            setError("Please select a Restaurant image.");
+        if (!isEditMode && !formData.postImage) {
+            setError("Please select a Post Image.");
             return;
         }
 
@@ -190,7 +190,7 @@ export const CreatePostModal = memo(function CreatePostModal({
 
             // Build JSON data payload from form values
             const dataPayload = {
-                restaurantName: formData.restaurantName,
+                brandSubject: formData.brandSubject,
                 description: formData.description,
                 itemsToPromote: formData.itemsToPromote,
                 minFollowers: formData.minFollowers,
@@ -207,14 +207,14 @@ export const CreatePostModal = memo(function CreatePostModal({
             const fd = new FormData();
 
             if (isEditMode) {
-                const useExisting = (!formData.restaurantImage && !!initialData?.existingImageUrl);
+                const useExisting = (!formData.postImage && !!initialData?.existingImageUrl);
                 const fields = {
                     user_id: userId,
                     use_existing_image: useExisting ? "true" : "false",
                     data: dataPayload,
                     post_id: initialData?.postId || "",
                 };
-                const file = formData.restaurantImage || undefined;
+                const file = formData.postImage || undefined;
 
                 const { success, message } = await localapi.putMultipart("update_post", fields, file as any);
                 if (!success) {
@@ -228,7 +228,7 @@ export const CreatePostModal = memo(function CreatePostModal({
                     user_id: userId,
                     data: dataPayload,
                 };
-                const file = formData.restaurantImage || undefined;
+                const file = formData.postImage || undefined;
 
                 const { success, message } = await localapi.postMultipart("posts", fields, file as any);
                 if (!success) {
@@ -270,7 +270,7 @@ export const CreatePostModal = memo(function CreatePostModal({
                 onClick={(e) => e.stopPropagation()}
             >
                 <h2 style={styles.title}>
-                    {isEditMode ? "Edit Campaign" : "Create Restaurant Promotion"}
+                    {isEditMode ? "Edit Campaign" : "Create Brand Promotion"}
                 </h2>
 
                 {/* ... (Keep Error and Required Fields Note) ... */}
@@ -282,8 +282,8 @@ export const CreatePostModal = memo(function CreatePostModal({
 
                 {/* ... (Keep Name, Description, Items, Followers inputs same as before) ... */}
                 <div style={styles.field}>
-                    <label style={styles.label}>Restaurant Name *</label>
-                    <input type="text" style={styles.input} value={formData.restaurantName} onChange={(e) => update("restaurantName", e.target.value)} />
+                    <label style={styles.label}>Brand Subject / Campaign Name *</label>
+                    <input type="text" style={styles.input} value={formData.brandSubject} onChange={(e) => update("brandSubject", e.target.value)} />
                 </div>
 
                 <div style={styles.field}>
@@ -357,7 +357,7 @@ export const CreatePostModal = memo(function CreatePostModal({
                 {/* Restaurant Image Picker */}
                 <div style={styles.field}>
                     <label style={styles.label}>
-                        Restaurant Image {!isEditMode && <span style={{ color: "#fa4848" }}>*</span>}
+                        Post Cover Image {!isEditMode && <span style={{ color: "#fa4848" }}>*</span>}
                     </label>
                     <input
                         type="file"
@@ -379,7 +379,7 @@ export const CreatePostModal = memo(function CreatePostModal({
                                     opacity: isSubmitting ? 0.5 : 1,
                                 }}
                             />
-                            {isEditMode && !formData.restaurantImage && (
+                            {isEditMode && !formData.postImage && (
                                 <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Current Image</div>
                             )}
                         </div>
@@ -392,7 +392,7 @@ export const CreatePostModal = memo(function CreatePostModal({
                     <input type="url" style={styles.input} value={formData.googleMapsLink} onChange={(e) => update("googleMapsLink", e.target.value)} />
                 </div>
                 <div style={styles.field}>
-                    <label style={styles.label}>Restaurant Address *</label>
+                    <label style={styles.label}>Business Address *</label>
                     <textarea style={styles.textarea} value={formData.address} onChange={(e) => update("address", e.target.value)} rows={2} />
                 </div>
                 <div style={styles.field}>

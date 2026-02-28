@@ -30,7 +30,7 @@ type Submission = {
     _id: string;
     post_id: string;
     influencer_id: string;
-    status?: 'pending' | 'accepted' | 'rejected';
+    status?: 'requested' | 'accepted' | 'rejected' | 'proof_submitted' | 'review_completed' | 'credited_money';
     updated_at: string;
     post_title?: string;
     post_image?: string;
@@ -38,7 +38,7 @@ type Submission = {
 
 export default function MySubmissionsScreen() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<'all' | 'accepted' | 'pending' | 'rejected'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'accepted' | 'requested' | 'rejected'>('all');
 
     const [submissions, setSubmissions] = useState<Submission[]>([]);
     const [loading, setLoading] = useState(true);
@@ -162,7 +162,7 @@ export default function MySubmissionsScreen() {
         const tabs: Array<{ key: typeof activeTab; label: string }> = [
             { key: 'all', label: 'All' },
             { key: 'accepted', label: 'Approved' },
-            { key: 'pending', label: 'Pending' },
+            { key: 'requested', label: 'Pending' },
             { key: 'rejected', label: 'Rejected' },
         ];
 
@@ -230,7 +230,7 @@ export default function MySubmissionsScreen() {
                                         {sub.post_title || "Unknown Brand"}
                                     </Text>
                                     <View style={[styles.badge, { backgroundColor: getStatusColor(sub.status) }]}>
-                                        <Text style={styles.badgeText}>{(sub.status || 'pending').toUpperCase()}</Text>
+                                        <Text style={styles.badgeText}>{(sub.status || 'requested').toUpperCase()}</Text>
                                     </View>
                                 </View>
 

@@ -32,13 +32,15 @@ type KeyValuePair = {
 
 type APIRestaurantPost = {
     postId: string;
-    restaurantName: string;
+    brandSubject?: string;
+    restaurantName?: string;
     description: string;
     itemsToPromote: string;
     minFollowers: string;
     minFollowersUnit: string;
     keyValuePairs: KeyValuePair[];
-    restaurantImage: string;
+    postImage?: string;
+    restaurantImage?: string;
     googleMapsLink: string;
     address: string;
     guidelines: string;
@@ -48,7 +50,7 @@ type APIRestaurantPost = {
 };
 
 type SubmissionType = {
-    status?: 'pending' | 'accepted' | 'rejected';
+    status?: 'requested' | 'accepted' | 'rejected' | 'proof_submitted' | 'review_completed' | 'credited_money';
     link: string;
     description?: string;
     verification_status?: string;
@@ -89,11 +91,11 @@ const DetailsContent = ({ post }: { post: APIRestaurantPost }) => (
     <>
         <View style={localStyles.heroSection}>
             <Image
-                source={{ uri: post.restaurantImage || 'https://via.placeholder.com/320x140?text=No+Image' }}
+                source={{ uri: post.postImage || post.restaurantImage || 'https://via.placeholder.com/320x140?text=No+Image' }}
                 style={localStyles.restaurantImage}
                 resizeMode="cover"
             />
-            <Text style={localStyles.restaurantName}>{post.restaurantName}</Text>
+            <Text style={localStyles.restaurantName}>{post.brandSubject || post.restaurantName}</Text>
             {post.category && <Text style={localStyles.categoryBadge}>{post.category}</Text>}
             <Text style={localStyles.description}>{post.description}</Text>
         </View>
@@ -263,16 +265,20 @@ const SubmitLinkForm = ({
     );
 };
 
-const TrackingSteps = ({ subStatus, link, verificationStatus, paymentStatus }: { subStatus: string | undefined, link: string | undefined, verificationStatus: string | undefined, paymentStatus: string | undefined }) => {
-    const isAccepted = subStatus === 'accepted';
+const TrackingSteps = ({ subStatus }: { subStatus: string | undefined }) => {
+    const isRequested = !!subStatus;
+    const isAccepted = subStatus === 'accepted' || subStatus === 'proof_submitted' || subStatus === 'review_completed' || subStatus === 'credited_money';
     const isRejected = subStatus === 'rejected';
+    const isProofSubmitted = subStatus === 'proof_submitted' || subStatus === 'review_completed' || subStatus === 'credited_money';
+    const isReviewCompleted = subStatus === 'review_completed' || subStatus === 'credited_money';
+    const isCreditedMoney = subStatus === 'credited_money';
 
     const steps = [
-        { label: "Requested", active: !!subStatus || !!link },
-        { label: isRejected ? "Rejected" : "Accepted", active: isAccepted || isRejected || !!link, error: isRejected },
-        { label: "Proof Submitted", active: !!link },
-        { label: "Review Completed", active: verificationStatus === "approved" || paymentStatus === "paid" },
-        { label: "Credited Money", active: paymentStatus === "paid" }
+        { label: "Requested", active: isRequested },
+        { label: isRejected ? "Rejected" : "Accepted", active: isAccepted || isRejected, error: isRejected },
+        { label: "Proof Submitted", active: isProofSubmitted },
+        { label: "Review Completed", active: isReviewCompleted },
+        { label: "Credited Money", active: isCreditedMoney }
     ];
 
     return (
@@ -363,15 +369,12 @@ const PostSubmissionSection = ({
     }
 
     // 3. Subscribed -> Show Tracker & Submission Form/Status
-    const status = submission?.status || (isSubscribed ? 'pending' : undefined);
+    const status = submission?.status || (isSubscribed ? 'requested' : undefined);
 
     return (
         <View>
             <TrackingSteps
                 subStatus={status}
-                link={submission?.link}
-                verificationStatus={submission?.verification_status}
-                paymentStatus={submission?.payment_status}
             />
 
             {submission?.link && !showEditForm ? (
@@ -407,7 +410,7 @@ const PostSubmissionSection = ({
                         setSubmission(prev => ({
                             link,
                             description: notes,
-                            status: prev?.status || 'pending',
+                            status: 'proof_submitted',
                             verification_status: prev?.verification_status || 'pending',
                             payment_status: prev?.payment_status || 'pending'
                         }));
@@ -482,13 +485,13 @@ const RestaurantDetailsScreen: React.FC = () => {
                 const data = res.data.data;
                 const mappedPost: APIRestaurantPost = {
                     postId: data._id,
-                    restaurantName: data.restaurantName ?? "",
+                    brandSubject: data.brandSubject ?? data.restaurantName ?? "",
                     description: data.description ?? "",
                     itemsToPromote: data.itemsToPromote ?? "",
                     minFollowers: data.minFollowers ?? "",
                     minFollowersUnit: data.minFollowersUnit ?? "K",
                     keyValuePairs: data.keyValuePairs ?? [],
-                    restaurantImage: data.restaurantImage || "",
+                    postImage: data.postImage || data.restaurantImage || "",
                     googleMapsLink: data.googleMapsLink ?? "",
                     address: data.address ?? "",
                     guidelines: data.guidelines ?? "",
@@ -529,7 +532,7 @@ const RestaurantDetailsScreen: React.FC = () => {
 
                         if (res.data.link || res.data.submission_status) {
                             setSubmission({
-                                status: res.data.submission_status || 'pending',
+                                status: res.data.submission_status || 'requested',
                                 link: res.data.link || '',
                                 description: res.data.description,
                                 verification_status: res.data.verification_status,
@@ -538,7 +541,7 @@ const RestaurantDetailsScreen: React.FC = () => {
                         } else {
                             // Subscribed but no actual submission entry yet
                             setSubmission({
-                                status: 'pending',
+                                status: 'requested',
                                 link: '',
                             });
                         }

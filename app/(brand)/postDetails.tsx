@@ -8,7 +8,8 @@ import {
     Linking,
     ScrollView,
     StyleSheet,
-    ActivityIndicator
+    ActivityIndicator,
+    Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -33,13 +34,15 @@ type KeyValuePair = {
 
 type APIRestaurantPost = {
     postId: string;
-    restaurantName: string;
+    brandSubject?: string;
+    restaurantName?: string;
     description: string;
     itemsToPromote: string;
     minFollowers: string;
     minFollowersUnit: string;
     keyValuePairs: KeyValuePair[];
-    restaurantImage: string; // URL from backend
+    postImage?: string; // URL from backend
+    restaurantImage?: string; // Legacy URL from backend
     googleMapsLink: string;
     address: string;
     guidelines: string;
@@ -58,8 +61,10 @@ const COLORS = {
     background: "#000000",
     surface: "#1A1A1A",
     surfaceLight: "#2A2A2A",
+    border: "#2A2A2A",
     white: "#FFFFFF",
     grey: "#9CA3AF",
+    greyLight: "#D1D5DB",
     tagReq: "#58398e",
     black: "#000000",
     shadow: "#000000",
@@ -104,6 +109,14 @@ const RestaurantDetailsScreen: React.FC = () => {
     const [enrolledUsers, setEnrolledUsers] = useState<any[]>([]);
     const [completedUsers, setCompletedUsers] = useState<string[]>([]);
 
+    // Payment Modal State
+    const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+    const [selectedUserForPayment, setSelectedUserForPayment] = useState<string | null>(null);
+
+    // Hardcoded wallet balance for MVP
+    const walletBalance = 5000;
+    const paymentAmount = 500;
+
     // Get ID from params (support both naming conventions just in case)
     const postId = typeof params.postId === "string" ? params.postId : "";
 
@@ -135,13 +148,13 @@ const RestaurantDetailsScreen: React.FC = () => {
                 // Map API response to our Type
                 const mappedPost: APIRestaurantPost = {
                     postId: data._id,
-                    restaurantName: data.restaurantName ?? "",
+                    brandSubject: data.brandSubject ?? data.restaurantName ?? "",
                     description: data.description ?? "",
                     itemsToPromote: data.itemsToPromote ?? "",
                     minFollowers: data.minFollowers ?? "",
                     minFollowersUnit: data.minFollowersUnit ?? "K",
                     keyValuePairs: data.keyValuePairs ?? [],
-                    restaurantImage: data.restaurantImage || "",
+                    postImage: data.postImage || data.restaurantImage || "",
                     googleMapsLink: data.googleMapsLink ?? "",
                     address: data.address ?? "",
                     guidelines: data.guidelines ?? "",
@@ -188,7 +201,7 @@ const RestaurantDetailsScreen: React.FC = () => {
             // Here, we map the current `post` state to the Form Shape.
 
             const formShape = {
-                restaurantName: post.restaurantName,
+                brandSubject: post.brandSubject || post.restaurantName,
                 description: post.description,
                 itemsToPromote: post.itemsToPromote,
                 minFollowers: post.minFollowers,
@@ -198,7 +211,7 @@ const RestaurantDetailsScreen: React.FC = () => {
                 address: post.address,
                 guidelines: post.guidelines,
                 // Vital for the Modal to know we are in edit mode:
-                existingImageUrl: post.restaurantImage,
+                existingImageUrl: post.postImage || post.restaurantImage,
                 postId: post.postId
             };
 
@@ -302,6 +315,49 @@ const RestaurantDetailsScreen: React.FC = () => {
         }
     };
 
+    const handleReviewComplete = async (influencerId: string) => {
+        try {
+            const endpoint = `${postId}/submissions/${influencerId}/review-complete`;
+            const res = await localapi.patch(endpoint, {});
+            if (!res.success) throw new Error(res.message || "Failed to mark review complete");
+            fetchPost(); // refresh list
+        } catch (e: any) {
+            console.error("Review complete failed", e);
+            alert(e?.message || "Review complete failed");
+        }
+    };
+
+    const handleUndoReviewComplete = async (influencerId: string) => {
+        try {
+            const endpoint = `${postId}/submissions/${influencerId}/undo-review-complete`;
+            const res = await localapi.patch(endpoint, {});
+            if (!res.success) throw new Error(res.message || "Failed to undo review complete");
+            fetchPost(); // refresh list
+        } catch (e: any) {
+            console.error("Undo review complete failed", e);
+            alert(e?.message || "Undo review complete failed");
+        }
+    };
+
+    const handleCreditMoney = async (influencerId: string) => {
+        try {
+            const endpoint = `${postId}/submissions/${influencerId}/credit-money`;
+            const res = await localapi.patch(endpoint, {});
+            if (!res.success) throw new Error(res.message || "Failed to credit money");
+            fetchPost(); // refresh list
+        } catch (e: any) {
+            console.error("Credit money failed", e);
+            alert(e?.message || "Credit money failed");
+        }
+    };
+
+    const confirmPayment = async () => {
+        if (!selectedUserForPayment) return;
+        await handleCreditMoney(selectedUserForPayment);
+        setPaymentModalVisible(false);
+        setSelectedUserForPayment(null);
+    };
+
     /* --------------------------- Render Helpers --------------------------- */
 
     const renderRewardChip = (pair: KeyValuePair, idx: number) => {
@@ -353,11 +409,11 @@ const RestaurantDetailsScreen: React.FC = () => {
                     {/* Hero Section */}
                     <View style={localStyles.heroSection}>
                         <Image
-                            source={{ uri: post.restaurantImage || 'https://via.placeholder.com/320x140?text=No+Image' }}
+                            source={{ uri: post.postImage || post.restaurantImage || 'https://via.placeholder.com/320x140?text=No+Image' }}
                             style={localStyles.restaurantImage}
                             resizeMode="cover"
                         />
-                        <Text style={localStyles.restaurantName}>{post.restaurantName}</Text>
+                        <Text style={localStyles.restaurantName}>{post.brandSubject || post.restaurantName}</Text>
                         {post.category && <Text style={localStyles.categoryBadge}>{post.category}</Text>}
                         <Text style={localStyles.description}>{post.description}</Text>
                     </View>
@@ -503,11 +559,11 @@ const RestaurantDetailsScreen: React.FC = () => {
                         {/* Hero Section */}
                         <View style={localStyles.heroSection}>
                             <Image
-                                source={{ uri: post.restaurantImage || 'https://via.placeholder.com/320x140?text=No+Image' }}
+                                source={{ uri: post.postImage || post.restaurantImage || 'https://via.placeholder.com/320x140?text=No+Image' }}
                                 style={localStyles.restaurantImage}
                                 resizeMode="cover"
                             />
-                            <Text style={localStyles.restaurantName}>{post.restaurantName}</Text>
+                            <Text style={localStyles.restaurantName}>{post.brandSubject || post.restaurantName}</Text>
                             {post.category && <Text style={localStyles.categoryBadge}>{post.category}</Text>}
                             <Text style={localStyles.description}>{post.description}</Text>
                         </View>
@@ -626,16 +682,48 @@ const RestaurantDetailsScreen: React.FC = () => {
                                             : user.submission_status === 'rejected' ? COLORS.error
                                                 : COLORS.secondary
                                     }]}>
-                                        <Text style={localStyles.statusText}>{user.submission_status?.toUpperCase() || 'PENDING'}</Text>
+                                        <Text style={localStyles.statusText}>
+                                            {user.submission_status ? user.submission_status.replace('_', ' ').toUpperCase() : 'REQUESTED'}
+                                        </Text>
                                     </View>
                                 </View>
-                                {user.submission_status === 'pending' && (
+                                {user.submission_status === 'requested' && (
                                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                                         <TouchableOpacity style={[localStyles.editButton, { flex: 1, paddingVertical: 6, backgroundColor: COLORS.primary }]} onPress={() => handleAccept(user.influencer_id)}>
                                             <Text style={localStyles.btnTextWhite}>Accept</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity style={[localStyles.deleteButton, { flex: 1, paddingVertical: 6, borderColor: COLORS.error }]} onPress={() => handleReject(user.influencer_id)}>
                                             <Text style={[localStyles.btnTextWhite, { color: COLORS.error }]}>Reject</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                                {user.link && user.submission_status === 'proof_submitted' && (
+                                    <View style={{ marginTop: 12, padding: 12, backgroundColor: COLORS.background, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border }}>
+                                        <Text style={{ fontSize: 11, color: COLORS.grey, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Proof Link</Text>
+                                        <TouchableOpacity onPress={() => Linking.openURL(user.link!)}>
+                                            <Text style={{ fontSize: 13, color: COLORS.primary, textDecorationLine: 'underline' }} selectable>{user.link}</Text>
+                                        </TouchableOpacity>
+                                        {user.description && (
+                                            <View style={{ marginTop: 8 }}>
+                                                <Text style={{ fontSize: 11, color: COLORS.grey, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Notes</Text>
+                                                <Text style={{ fontSize: 14, color: COLORS.greyLight, lineHeight: 20 }}>{user.description}</Text>
+                                            </View>
+                                        )}
+                                        <TouchableOpacity style={[localStyles.editButton, { marginTop: 12, paddingVertical: 6, backgroundColor: COLORS.primary }]} onPress={() => handleReviewComplete(user.influencer_id)}>
+                                            <Text style={localStyles.btnTextWhite}>Complete Review</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                                {user.submission_status === 'review_completed' && (
+                                    <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
+                                        <TouchableOpacity style={[localStyles.deleteButton, { flex: 1, paddingVertical: 6, borderColor: COLORS.error }]} onPress={() => handleUndoReviewComplete(user.influencer_id)}>
+                                            <Text style={[localStyles.btnTextWhite, { color: COLORS.error }]}>Undo Review</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={[localStyles.editButton, { flex: 1, paddingVertical: 6, backgroundColor: COLORS.primary }]} onPress={() => {
+                                            setSelectedUserForPayment(user.influencer_id);
+                                            setPaymentModalVisible(true);
+                                        }}>
+                                            <Text style={localStyles.btnTextWhite}>Pay Amount</Text>
                                         </TouchableOpacity>
                                     </View>
                                 )}
@@ -653,6 +741,50 @@ const RestaurantDetailsScreen: React.FC = () => {
                     </ScrollView>
                 </View>
             )}
+
+            {/* Confirm Payment Modal */}
+            <Modal visible={paymentModalVisible} transparent animationType="fade">
+                <View style={localStyles.modalOverlay}>
+                    <View style={localStyles.modalContent}>
+                        <View style={localStyles.modalHeader}>
+                            <Text style={localStyles.modalTitle}>Confirm Payment</Text>
+                            <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
+                                <Ionicons name="close" size={24} color={COLORS.grey} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={localStyles.modalBody}>
+                            <Text style={localStyles.modalText}>You are about to credit money to the influencer.</Text>
+
+                            <View style={localStyles.balanceCard}>
+                                <View style={localStyles.balanceRow}>
+                                    <Text style={localStyles.balanceLabel}>Wallet Balance</Text>
+                                    <Text style={localStyles.balanceAmount}>₹{walletBalance}</Text>
+                                </View>
+                                <View style={{ height: 1, backgroundColor: COLORS.border, marginVertical: 12 }} />
+                                <View style={localStyles.balanceRow}>
+                                    <Text style={localStyles.balanceLabel}>Amount to Pay</Text>
+                                    <Text style={[localStyles.balanceAmount, { color: COLORS.error }]}>-₹{paymentAmount}</Text>
+                                </View>
+                                <View style={{ height: 1, backgroundColor: COLORS.border, marginVertical: 12 }} />
+                                <View style={localStyles.balanceRow}>
+                                    <Text style={[localStyles.balanceLabel, { color: COLORS.white, fontWeight: '600' }]}>Remaining Balance</Text>
+                                    <Text style={[localStyles.balanceAmount, { color: COLORS.primary }]}>₹{walletBalance - paymentAmount}</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={localStyles.modalFooter}>
+                            <TouchableOpacity style={localStyles.modalCancelBtn} onPress={() => setPaymentModalVisible(false)}>
+                                <Text style={localStyles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={localStyles.modalConfirmBtn} onPress={confirmPayment}>
+                                <Text style={localStyles.modalConfirmText}>Confirm & Pay</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
             {editModalVisible && (
                 <CreatePostModal
@@ -926,4 +1058,21 @@ const localStyles = StyleSheet.create({
         fontSize: 10,
         fontWeight: "bold",
     },
+
+    // Payment Modal Styles
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalContent: { width: '100%', maxWidth: 400, backgroundColor: COLORS.surface, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    modalTitle: { fontSize: 18, fontWeight: '700', color: COLORS.white },
+    modalBody: { padding: 20 },
+    modalText: { color: COLORS.greyLight, fontSize: 14, marginBottom: 20 },
+    balanceCard: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: COLORS.border },
+    balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    balanceLabel: { color: COLORS.grey, fontSize: 14 },
+    balanceAmount: { color: COLORS.white, fontSize: 16, fontWeight: '600' },
+    modalFooter: { flexDirection: 'row', padding: 20, paddingTop: 0, gap: 12 },
+    modalCancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: COLORS.surfaceLight, borderWidth: 1, borderColor: COLORS.border },
+    modalCancelText: { color: COLORS.white, fontSize: 14, fontWeight: '600' },
+    modalConfirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: COLORS.primary },
+    modalConfirmText: { color: COLORS.background, fontSize: 14, fontWeight: '700' },
 });
